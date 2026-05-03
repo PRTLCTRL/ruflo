@@ -36,11 +36,12 @@ export function generateSettings(options: InitOptions): object {
     ],
   };
 
-  // Add RuFlo attribution for git commits and PRs
-  settings.attribution = {
-    commit: 'Co-Authored-By: RuFlo <ruv@ruv.net>',
-    pr: '🤖 Generated with [RuFlo](https://github.com/ruvnet/ruflo)',
-  };
+  // Attribution for git commits and PRs (opt-in only)
+  // To enable, uncomment and customize:
+  // settings.attribution = {
+  //   commit: 'Co-Authored-By: RuFlo <ruv@ruv.net>',
+  //   pr: '🤖 Generated with [RuFlo](https://github.com/ruvnet/ruflo)',
+  // };
 
   // Note: Claude Code expects 'model' to be a string, not an object
   // Model preferences are stored in claudeFlow settings instead

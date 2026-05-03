@@ -198,9 +198,9 @@ const DEFAULT_CONFIG: CommitConfig = {
   maxSubjectLength: 72,
   maxBodyLength: 100,
   requireConventional: true,
-  addCoAuthor: true,
+  addCoAuthor: false,  // Opt-in only - requires user consent
   coAuthor: DEFAULT_CO_AUTHOR,
-  addClaudeReference: true,
+  addClaudeReference: false,  // Opt-in only - requires user consent
 };
 
 /**
