@@ -27,6 +27,7 @@ export class CommandParser {
   private commands: Map<string, Command> = new Map();
   private lazyCommandNames: Set<string> = new Set();
   private globalOptions: CommandOption[] = [];
+  private lazyCommandLoader?: (name: string) => Promise<Command | undefined>;
 
   constructor(options: ParserOptions = {}) {
     this.options = {
@@ -119,6 +120,43 @@ export class CommandParser {
     this.lazyCommandNames.add(name);
   }
 
+  /**
+   * Set a lazy command loader function for loading commands on-demand.
+   * Fix for #1651: allows the parser to load lazy commands during parsing
+   * so their subcommand options (including short flags) can be resolved.
+   */
+  setLazyCommandLoader(loader: (name: string) => Promise<Command | undefined>): void {
+    this.lazyCommandLoader = loader;
+  }
+
+  /**
+   * Load a lazy command if a loader is configured.
+   * Fix for #1651: loads the command so its subcommands and their options
+   * can be resolved during Pass 1.
+   */
+  private async loadLazyCommand(name: string): Promise<Command | undefined> {
+    if (!this.lazyCommandLoader) {
+      return undefined;
+    }
+
+    try {
+      const command = await this.lazyCommandLoader(name);
+      if (command) {
+        // Register the loaded command so it's available immediately
+        this.commands.set(command.name, command);
+        if (command.aliases) {
+          for (const alias of command.aliases) {
+            this.commands.set(alias, command);
+          }
+        }
+      }
+      return command;
+    } catch (error) {
+      // Silently fail - the command might not be available
+      return undefined;
+    }
+  }
+
   private isKnownCommandName(name: string): boolean {
     return this.commands.has(name) || this.lazyCommandNames.has(name);
   }
@@ -137,7 +175,7 @@ export class CommandParser {
     });
   }
 
-  parse(args: string[]): ParseResult {
+  async parse(args: string[]): Promise<ParseResult> {
     const result: ParseResult = {
       command: [],
       flags: { _: [] },
@@ -162,9 +200,16 @@ export class CommandParser {
           resolvedCmd = this.commands.get(arg);
           continue;
         }
-        // Lazy command: we know its name but not its subcommands. Stop the
-        // walk here — we'll rely on Pass 2 to push it onto commandPath.
+        // Fix for #1651: Lazy command — synchronously load it so subsequent iterations
+        // can resolve the level-2 subcommand and its short flag aliases.
         if (this.lazyCommandNames.has(arg)) {
+          // Attempt to load the lazy command synchronously
+          const loadedCmd = await this.loadLazyCommand(arg);
+          if (loadedCmd) {
+            resolvedCmd = loadedCmd;
+            continue;
+          }
+          // If loading failed, break here as before
           break;
         }
         // Unknown first positional — not a command. Stop walking.

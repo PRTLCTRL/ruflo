@@ -68,6 +68,12 @@ export class CLI {
     for (const name of getLazyCommandNames()) {
       this.parser.registerLazyCommandName(name);
     }
+
+    // Fix for #1651: Set up lazy command loader so the parser can load lazy commands
+    // during parsing to resolve their subcommand short flags.
+    this.parser.setLazyCommandLoader(async (name: string) => {
+      return await getCommandAsync(name);
+    });
   }
 
   /**
@@ -76,7 +82,7 @@ export class CLI {
   async run(args: string[] = process.argv.slice(2)): Promise<void> {
     try {
       // Parse arguments
-      const parseResult = this.parser.parse(args);
+      const parseResult = await this.parser.parse(args);
       const { command: commandPath, flags, positional } = parseResult;
 
       // Handle global flags
