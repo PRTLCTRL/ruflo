@@ -640,28 +640,43 @@ const statsCommand: Command = {
     try {
       const statsResult = await callMCPTool('memory_stats', {}) as {
         totalEntries: number;
-        totalSize: string;
+        entriesWithEmbeddings: number;
+        embeddingCoverage: string;
+        totalSize?: string;
         version: string;
         backend: string;
-        location: string;
-        oldestEntry: string | null;
-        newestEntry: string | null;
+        location?: string;
+        oldestEntry?: string | null;
+        newestEntry?: string | null;
+        embedding?: {
+          provider: string;
+          dimensions: number;
+          semantic: boolean;
+          loaded: boolean;
+        };
+        hnsw?: {
+          available: boolean;
+          initialized: boolean;
+          entryCount: number;
+        };
       };
 
       const stats = {
         backend: statsResult.backend,
         entries: {
           total: statsResult.totalEntries,
-          vectors: 0, // Would need vector backend support
-          text: statsResult.totalEntries
+          withEmbeddings: statsResult.entriesWithEmbeddings || 0,
+          coverage: statsResult.embeddingCoverage || '0%'
         },
         storage: {
-          total: statsResult.totalSize,
-          location: statsResult.location
+          total: statsResult.totalSize || 'Unknown',
+          location: statsResult.location || 'Unknown'
         },
         version: statsResult.version,
         oldestEntry: statsResult.oldestEntry,
-        newestEntry: statsResult.newestEntry
+        newestEntry: statsResult.newestEntry,
+        embedding: statsResult.embedding,
+        hnsw: statsResult.hnsw
       };
 
       if (ctx.flags.format === 'json') {
@@ -683,26 +698,68 @@ const statsCommand: Command = {
           { metric: 'Backend', value: stats.backend },
           { metric: 'Version', value: stats.version },
           { metric: 'Total Entries', value: stats.entries.total.toLocaleString() },
-          { metric: 'Total Storage', value: stats.storage.total },
-          { metric: 'Location', value: stats.storage.location }
+          { metric: 'With Embeddings', value: stats.entries.withEmbeddings.toLocaleString() },
+          { metric: 'Coverage', value: stats.entries.coverage }
         ]
       });
 
-      output.writeln();
-      output.writeln(output.bold('Timeline'));
-      output.printTable({
-        columns: [
-          { key: 'metric', header: 'Metric', width: 20 },
-          { key: 'value', header: 'Value', width: 30, align: 'right' }
-        ],
-        data: [
-          { metric: 'Oldest Entry', value: stats.oldestEntry || 'N/A' },
-          { metric: 'Newest Entry', value: stats.newestEntry || 'N/A' }
-        ]
-      });
+      // Embedding provider section
+      if (stats.embedding) {
+        output.writeln();
+        output.writeln(output.bold('Embedding'));
+        output.printTable({
+          columns: [
+            { key: 'metric', header: 'Metric', width: 20 },
+            { key: 'value', header: 'Value', width: 30, align: 'right' }
+          ],
+          data: [
+            { metric: 'Provider', value: stats.embedding.provider },
+            { metric: 'Dimensions', value: stats.embedding.dimensions.toString() },
+            { metric: 'Semantic Search', value: stats.embedding.semantic ? 'Yes' : 'No' },
+            { metric: 'Loaded', value: stats.embedding.loaded ? 'Yes' : 'Lazy (on-demand)' }
+          ]
+        });
+      }
+
+      // HNSW index section
+      if (stats.hnsw) {
+        output.writeln();
+        output.writeln(output.bold('HNSW Fast Search'));
+        output.printTable({
+          columns: [
+            { key: 'metric', header: 'Metric', width: 20 },
+            { key: 'value', header: 'Value', width: 30, align: 'right' }
+          ],
+          data: [
+            { metric: 'Available', value: stats.hnsw.available ? 'Yes' : 'No' },
+            { metric: 'Initialized', value: stats.hnsw.initialized ? 'Yes' : 'No' },
+            { metric: 'Indexed Entries', value: stats.hnsw.entryCount.toLocaleString() }
+          ]
+        });
+      }
+
+      // Timeline section (optional)
+      if (stats.oldestEntry || stats.newestEntry) {
+        output.writeln();
+        output.writeln(output.bold('Timeline'));
+        output.printTable({
+          columns: [
+            { key: 'metric', header: 'Metric', width: 20 },
+            { key: 'value', header: 'Value', width: 30, align: 'right' }
+          ],
+          data: [
+            { metric: 'Oldest Entry', value: stats.oldestEntry || 'N/A' },
+            { metric: 'Newest Entry', value: stats.newestEntry || 'N/A' }
+          ]
+        });
+      }
 
       output.writeln();
-      output.printInfo('V3 Performance: 150x-12,500x faster search with HNSW indexing');
+      if (stats.hnsw?.available) {
+        output.printInfo('V3 Performance: 150x-12,500x faster search with HNSW indexing');
+      } else {
+        output.printWarning('Install @ruvector/core for 150x-12,500x faster HNSW search');
+      }
 
       return { success: true, data: stats };
     } catch (error) {
