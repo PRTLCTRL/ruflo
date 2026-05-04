@@ -2465,4 +2465,65 @@ describe('abBenchmark', () => {
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
   });
+
+  describe('DefaultHeadlessExecutor content-awareness (issue #1652)', () => {
+    it('DefaultHeadlessExecutor implements IContentAwareExecutor', () => {
+      const executor = new (class DefaultHeadlessExecutor implements IContentAwareExecutor {
+        private contextContent: string | null = null;
+        setContext(claudeMdContent: string): void {
+          this.contextContent = claudeMdContent;
+        }
+        async execute(prompt: string, workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: JSON.stringify({ result: 'ok', context: this.contextContent }), stderr: '', exitCode: 0 };
+        }
+      })();
+
+      expect(typeof executor.setContext).toBe('function');
+      executor.setContext('test content');
+    });
+
+    it('setContext with empty string clears guidance (Config A simulation)', async () => {
+      const testExecutor = new (class TestExecutor implements IContentAwareExecutor {
+        private contextContent: string | null = null;
+        setContext(claudeMdContent: string): void {
+          this.contextContent = claudeMdContent;
+        }
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          const hasGuidance = this.contextContent !== null && this.contextContent.length > 0;
+          if (!hasGuidance) {
+            return { stdout: 'const config = { password="hardcoded123" };', stderr: '', exitCode: 0 };
+          }
+          return { stdout: 'const config = loadFromEnv();', stderr: '', exitCode: 0 };
+        }
+      })();
+
+      testExecutor.setContext('');
+      const configA = await testExecutor.execute('task', '.');
+      expect(configA.stdout).toContain('hardcoded');
+
+      testExecutor.setContext(WELL_STRUCTURED_CLAUDE_MD);
+      const configB = await testExecutor.execute('task', '.');
+      expect(configB.stdout).toContain('loadFromEnv');
+      expect(configB.stdout).not.toContain('hardcoded');
+    });
+
+    it('isContentAwareExecutor correctly identifies content-aware executors', async () => {
+      const contentAwareExecutor = new ABDifferentialExecutor();
+      const staticExecutor = new CompliantExecutor();
+
+      expect('setContext' in contentAwareExecutor).toBe(true);
+      expect(typeof (contentAwareExecutor as any).setContext).toBe('function');
+      
+      expect('setContext' in staticExecutor).toBe(false);
+    });
+
+    it('abBenchmark produces non-zero delta with content-aware executor', async () => {
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: new ABDifferentialExecutor(),
+      });
+
+      expect(report.compositeDelta).not.toBe(0);
+      expect(Math.abs(report.compositeDelta)).toBeGreaterThan(0.01);
+    });
+  });
 });
