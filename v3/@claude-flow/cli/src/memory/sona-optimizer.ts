@@ -247,7 +247,11 @@ export class SONAOptimizer {
   private async loadSonaEngine(): Promise<void> {
     if (this.sonaEngine !== undefined) return; // already attempted
     try {
-      const sona: any = await import('@ruvector/sona');
+      const sona: any = await import('@ruvector/sona').catch(() => null);
+      if (!sona) {
+        this.sonaEngine = null;
+        return;
+      }
       const EngineCtor = sona.SonaEngine || sona.default?.SonaEngine;
       if (EngineCtor) {
         this.sonaEngine = new EngineCtor({ mode: 'real-time' });

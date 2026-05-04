@@ -145,6 +145,14 @@ declare module '@ruvector/core' {
   export default core;
 }
 
+declare module '@ruvector/sona' {
+  export class SonaEngine {
+    constructor(options?: { mode?: string });
+  }
+  const sona: any;
+  export default sona;
+}
+
 declare module '@ruvector/rvagent-wasm' {
   /** Initialize the WASM module (browser — uses fetch for .wasm file). */
   export default function init(): Promise<void>;
