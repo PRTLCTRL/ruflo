@@ -165,6 +165,8 @@ export function createUserForm(): UserForm {
       expect(data.success).toBe(true);
       expect(data.results).toBeDefined();
       expect(Array.isArray(data.results)).toBe(true);
+      // Note: Embeddings package may not be available in test environment
+      // Test passes if structure is correct, even with empty results
     });
 
     it('should filter by language', async () => {
@@ -186,6 +188,7 @@ export function createUserForm(): UserForm {
       const data = JSON.parse(result.content[0]?.text ?? '{}');
 
       expect(data.success).toBe(true);
+      // Structure is valid even if embeddings package not available
     });
 
     it('should exclude test files when requested', async () => {
@@ -212,8 +215,12 @@ export function createUserForm(): UserForm {
       const result = await semanticSearchTool.handler(input, context);
       const data = JSON.parse(result.content[0]?.text ?? '{}');
 
-      const files = data.results?.map((r: any) => r.file) ?? [];
-      expect(files.every((f: string) => !f.includes('.test.'))).toBe(true);
+      expect(data.success).toBe(true);
+      // If results exist, they should not include test files
+      const files = data.results?.map((r: any) => r.filePath) ?? [];
+      if (files.length > 0) {
+        expect(files.every((f: string) => !f.includes('.test.'))).toBe(true);
+      }
 
       // Clean up
       await fs.rm(path.join(tempDir, 'src/utils/validation.test.ts'), { force: true });

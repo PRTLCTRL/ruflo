@@ -41,6 +41,8 @@ import {
   CodeIntelligenceErrorCodes,
   maskSecrets,
   type AnalysisType,
+  type Language,
+  type SearchType,
 } from './types.js';
 import { createGNNBridge } from './bridges/gnn-bridge.js';
 import { createMinCutBridge } from './bridges/mincut-bridge.js';
@@ -656,7 +658,7 @@ async function performSemanticSearch(
   topK: number,
   languages: string[] | undefined,
   excludeTests: boolean,
-  context: ToolContext
+  _context: ToolContext
 ): Promise<CodeSearchResult[]> {
   const results: CodeSearchResult[] = [];
 
@@ -760,15 +762,17 @@ async function performSemanticSearch(
       // Extract snippet around most relevant section
       const snippet = content.slice(0, 500);
       const contextLines = content.split('\n').slice(0, 10).join('\n');
+      const detectedLang = detectLanguageFromPath(file);
 
       results.push({
-        file,
+        filePath: file,
         snippet,
         context: contextLines,
         score: similarity,
-        language: detectLanguageFromPath(file),
-        startLine: 1,
-        endLine: 10,
+        language: detectedLang as Language,
+        matchType: 'semantic' as SearchType,
+        lineNumber: 1,
+        explanation: `Semantic similarity: ${(similarity * 100).toFixed(1)}%`,
       });
     }
   } catch (error) {
@@ -796,9 +800,9 @@ function cosineSimilarity(a: number[], b: number[]): number {
 }
 
 /** Detect language from file path */
-function detectLanguageFromPath(filePath: string): string {
+function detectLanguageFromPath(filePath: string): Language {
   const ext = filePath.split('.').pop()?.toLowerCase();
-  const langMap: Record<string, string> = {
+  const langMap: Record<string, Language> = {
     ts: 'typescript',
     tsx: 'typescript',
     js: 'javascript',
@@ -809,8 +813,14 @@ function detectLanguageFromPath(filePath: string): string {
     rs: 'rust',
     cpp: 'cpp',
     c: 'cpp',
+    cs: 'csharp',
+    rb: 'ruby',
+    php: 'php',
+    swift: 'swift',
+    kt: 'kotlin',
+    scala: 'scala',
   };
-  return ext ? langMap[ext] ?? 'unknown' : 'unknown';
+  return ext && langMap[ext] ? langMap[ext]! : 'typescript';
 }
 
 async function getFilesInPath(rootPath: string): Promise<string[]> {
@@ -1006,7 +1016,12 @@ function findProjectRoot(startPath: string): string {
 
 /** Enrich graph with real import edges (compensates for GNNBridge.extractImports stub) */
 async function enrichGraphWithEdges(graph: DependencyGraph): Promise<DependencyGraph> {
-  const newEdges: DependencyEdge[] = [...graph.edges];
+  const newEdges: Array<{
+    from: string;
+    to: string;
+    type: 'import' | 'extends' | 'implements' | 'uses' | 'calls';
+    weight: number;
+  }> = [...graph.edges];
   const nodeIds = new Set(graph.nodes.map(n => n.id));
 
   // For each node, parse its file and extract actual imports
