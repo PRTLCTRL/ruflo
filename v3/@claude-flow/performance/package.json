@@ -20,7 +20,7 @@
     "@ruvector/sona": "latest"
   },
   "devDependencies": {
-    "vitest": "^4.0.16"
+    "vitest": "^4.1.4"
   },
   "publishConfig": {
     "access": "public",
