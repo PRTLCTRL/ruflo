@@ -15,6 +15,8 @@
 
 import { z } from 'zod';
 import path from 'path';
+import fs from 'fs/promises';
+import glob from 'fast-glob';
 import type {
   SemanticSearchResult,
   ArchitectureAnalysisResult,
@@ -270,37 +272,40 @@ export const architectureAnalyzeTool: MCPTool<
 
       const dependencyGraph = await gnn.buildCodeGraph(safeFiles, true);
 
+      // Enrich graph with real import edges (compensates for extractImports stub)
+      const enrichedGraph = await enrichGraphWithEdges(dependencyGraph);
+
       // Perform requested analyses
       const result: ArchitectureAnalysisResult = {
         success: true,
         rootPath,
         analyses: analyses as AnalysisType[],
-        dependencyGraph: analyses.includes('dependency_graph') ? dependencyGraph : undefined,
+        dependencyGraph: analyses.includes('dependency_graph') ? enrichedGraph : undefined,
         layerViolations: analyses.includes('layer_violations')
-          ? detectLayerViolations(dependencyGraph, validated.layers)
+          ? detectLayerViolations(enrichedGraph, validated.layers)
           : undefined,
         circularDeps: analyses.includes('circular_deps')
-          ? detectCircularDeps(dependencyGraph)
+          ? detectCircularDeps(enrichedGraph)
           : undefined,
         couplingMetrics: analyses.includes('component_coupling')
-          ? calculateCouplingMetrics(dependencyGraph)
+          ? calculateCouplingMetrics(enrichedGraph)
           : undefined,
         cohesionMetrics: analyses.includes('module_cohesion')
-          ? calculateCohesionMetrics(dependencyGraph)
+          ? calculateCohesionMetrics(enrichedGraph)
           : undefined,
         deadCode: analyses.includes('dead_code')
-          ? findDeadCode(dependencyGraph)
+          ? findDeadCode(enrichedGraph)
           : undefined,
         apiSurface: analyses.includes('api_surface')
-          ? analyzeAPISurface(dependencyGraph)
+          ? analyzeAPISurface(enrichedGraph)
           : undefined,
         drift: analyses.includes('architectural_drift') && validated.baseline
-          ? await detectDrift(dependencyGraph, validated.baseline)
+          ? await detectDrift(enrichedGraph, validated.baseline)
           : undefined,
         summary: {
-          totalFiles: dependencyGraph.nodes.length,
-          totalModules: countModules(dependencyGraph),
-          healthScore: calculateHealthScore(dependencyGraph),
+          totalFiles: enrichedGraph.nodes.length,
+          totalModules: countModules(enrichedGraph),
+          healthScore: calculateHealthScore(enrichedGraph),
           issues: 0,
           warnings: 0,
         },
@@ -645,29 +650,402 @@ export const learnPatternsTool: MCPTool<
 // ============================================================================
 
 async function performSemanticSearch(
-  _query: string,
-  _paths: string[],
-  _searchType: string,
+  query: string,
+  paths: string[],
+  searchType: string,
   topK: number,
-  _languages: string[] | undefined,
-  _excludeTests: boolean,
-  _context: ToolContext
+  languages: string[] | undefined,
+  excludeTests: boolean,
+  context: ToolContext
 ): Promise<CodeSearchResult[]> {
-  // Simplified implementation
   const results: CodeSearchResult[] = [];
 
-  // In production, would use vector index
-  return results.slice(0, topK);
+  try {
+    // Get all files in the specified paths
+    const allFiles: string[] = [];
+    for (const rootPath of paths) {
+      const files = await getFilesInPath(rootPath);
+      allFiles.push(...files);
+    }
+
+    // Filter by language if specified
+    let filteredFiles = allFiles;
+    if (languages && languages.length > 0) {
+      const langExtensions = languages.flatMap(lang => {
+        const extMap: Record<string, string[]> = {
+          typescript: ['.ts', '.tsx'],
+          javascript: ['.js', '.jsx'],
+          python: ['.py'],
+          java: ['.java'],
+          go: ['.go'],
+          rust: ['.rs'],
+          cpp: ['.cpp', '.cc', '.cxx', '.h', '.hpp'],
+        };
+        return extMap[lang] ?? [];
+      });
+      filteredFiles = allFiles.filter(file =>
+        langExtensions.some(ext => file.endsWith(ext))
+      );
+    }
+
+    // Exclude test files if requested
+    if (excludeTests) {
+      filteredFiles = filteredFiles.filter(file =>
+        !file.includes('.test.') &&
+        !file.includes('.spec.') &&
+        !file.includes('__tests__')
+      );
+    }
+
+    // Load @claude-flow/embeddings dynamically
+    let embeddings: any;
+    try {
+      embeddings = await import('@claude-flow/embeddings');
+    } catch {
+      // If embeddings package not available, return empty results
+      return results;
+    }
+
+    // Create embeddings instance
+    const embeddingsInstance = new embeddings.Embeddings({
+      model: 'all-MiniLM-L6-v2',
+      dimensions: 384,
+    });
+
+    // Generate query embedding
+    const queryEmbedding = await embeddingsInstance.embed(query);
+
+    // Read and embed file contents
+    const fileEmbeddings: Array<{ file: string; embedding: number[]; content: string }> = [];
+    for (const file of filteredFiles.slice(0, 1000)) {
+      try {
+        const stat = await fs.stat(file);
+        // Skip files larger than 100KB
+        if (stat.size > 100 * 1024) continue;
+
+        const content = await fs.readFile(file, 'utf-8');
+        
+        // For searchType filtering, extract relevant parts
+        let textToEmbed = content;
+        if (searchType === 'function') {
+          // Simple function extraction (matches function/async function declarations)
+          const functionMatches = content.match(/(?:async\s+)?function\s+\w+\s*\([^)]*\)\s*\{[^}]*\}/g);
+          if (functionMatches) textToEmbed = functionMatches.join('\n');
+        } else if (searchType === 'class') {
+          const classMatches = content.match(/class\s+\w+[^{]*\{[^}]*\}/g);
+          if (classMatches) textToEmbed = classMatches.join('\n');
+        }
+
+        if (textToEmbed.trim().length > 0) {
+          const embedding = await embeddingsInstance.embed(textToEmbed.slice(0, 5000));
+          fileEmbeddings.push({ file, embedding, content });
+        }
+      } catch {
+        // Skip files that can't be read
+        continue;
+      }
+    }
+
+    // Calculate cosine similarity
+    const similarities = fileEmbeddings.map(({ file, embedding, content }) => {
+      const similarity = cosineSimilarity(queryEmbedding, embedding);
+      return { file, similarity, content };
+    });
+
+    // Sort by similarity descending
+    similarities.sort((a, b) => b.similarity - a.similarity);
+
+    // Take top K and format results
+    for (const { file, similarity, content } of similarities.slice(0, topK)) {
+      // Extract snippet around most relevant section
+      const snippet = content.slice(0, 500);
+      const contextLines = content.split('\n').slice(0, 10).join('\n');
+
+      results.push({
+        file,
+        snippet,
+        context: contextLines,
+        score: similarity,
+        language: detectLanguageFromPath(file),
+        startLine: 1,
+        endLine: 10,
+      });
+    }
+  } catch (error) {
+    // If anything fails, return empty results rather than throwing
+    console.error('Semantic search error:', error);
+  }
+
+  return results;
 }
 
-async function getFilesInPath(_rootPath: string): Promise<string[]> {
-  // Simplified - in production would use glob
-  return [];
+/** Calculate cosine similarity between two vectors */
+function cosineSimilarity(a: number[], b: number[]): number {
+  let dot = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < Math.min(a.length, b.length); i++) {
+    dot += a[i]! * b[i]!;
+    normA += a[i]! * a[i]!;
+    normB += b[i]! * b[i]!;
+  }
+  
+  const denominator = Math.sqrt(normA) * Math.sqrt(normB);
+  return denominator > 0 ? dot / denominator : 0;
+}
+
+/** Detect language from file path */
+function detectLanguageFromPath(filePath: string): string {
+  const ext = filePath.split('.').pop()?.toLowerCase();
+  const langMap: Record<string, string> = {
+    ts: 'typescript',
+    tsx: 'typescript',
+    js: 'javascript',
+    jsx: 'javascript',
+    py: 'python',
+    java: 'java',
+    go: 'go',
+    rs: 'rust',
+    cpp: 'cpp',
+    c: 'cpp',
+  };
+  return ext ? langMap[ext] ?? 'unknown' : 'unknown';
+}
+
+async function getFilesInPath(rootPath: string): Promise<string[]> {
+  try {
+    // Use fast-glob for efficient recursive file discovery
+    const patterns = [
+      '**/*.ts',
+      '**/*.tsx',
+      '**/*.js',
+      '**/*.jsx',
+      '**/*.py',
+      '**/*.java',
+      '**/*.go',
+      '**/*.rs',
+      '**/*.cpp',
+      '**/*.c',
+      '**/*.h',
+    ];
+
+    const files = await glob(patterns, {
+      cwd: rootPath,
+      absolute: true,
+      ignore: [
+        '**/node_modules/**',
+        '**/dist/**',
+        '**/build/**',
+        '**/.git/**',
+        '**/coverage/**',
+        '**/.next/**',
+      ],
+      onlyFiles: true,
+      stats: true,
+    });
+
+    // Filter out files larger than 100KB
+    const filteredFiles: string[] = [];
+    for (const file of files) {
+      if (typeof file === 'string') {
+        try {
+          const stat = await fs.stat(file);
+          if (stat.size <= 100 * 1024) {
+            filteredFiles.push(file);
+          }
+        } catch {
+          // Skip files that can't be stat'd
+          continue;
+        }
+      }
+    }
+
+    return filteredFiles;
+  } catch (error) {
+    console.error('Error getting files in path:', error);
+    return [];
+  }
 }
 
 async function getAllRelatedFiles(changedFiles: string[]): Promise<string[]> {
-  // Simplified - would traverse dependencies
-  return changedFiles;
+  const relatedFiles = new Set<string>(changedFiles);
+  const visited = new Set<string>();
+  const maxDepth = 3;
+
+  // Forward BFS: find files that the changed files import
+  const forwardQueue: Array<{ file: string; depth: number }> = [];
+  for (const file of changedFiles) {
+    forwardQueue.push({ file, depth: 0 });
+    visited.add(file);
+  }
+
+  while (forwardQueue.length > 0) {
+    const current = forwardQueue.shift();
+    if (!current || current.depth >= maxDepth) continue;
+
+    try {
+      const content = await fs.readFile(current.file, 'utf-8');
+      const imports = extractImportsFromContent(content, current.file);
+
+      for (const importedFile of imports) {
+        if (!visited.has(importedFile)) {
+          visited.add(importedFile);
+          relatedFiles.add(importedFile);
+          forwardQueue.push({ file: importedFile, depth: current.depth + 1 });
+        }
+      }
+    } catch {
+      // Skip files that can't be read
+      continue;
+    }
+  }
+
+  // Reverse dependency scan: find files that import the changed files
+  // This requires scanning all project files (expensive, so we limit scope)
+  const projectRoot = findProjectRoot(changedFiles[0] ?? '.');
+  const allFiles = await getFilesInPath(projectRoot);
+
+  for (const file of allFiles) {
+    if (relatedFiles.has(file)) continue;
+
+    try {
+      const content = await fs.readFile(file, 'utf-8');
+      const imports = extractImportsFromContent(content, file);
+
+      // Check if this file imports any of our changed files
+      for (const changedFile of changedFiles) {
+        if (imports.includes(changedFile)) {
+          relatedFiles.add(file);
+          break;
+        }
+      }
+    } catch {
+      // Skip files that can't be read
+      continue;
+    }
+  }
+
+  return Array.from(relatedFiles);
+}
+
+/** Extract imports from file content */
+function extractImportsFromContent(content: string, sourceFile: string): string[] {
+  const imports: string[] = [];
+  const sourceDir = path.dirname(sourceFile);
+
+  // Match ES6 imports: import ... from 'path'
+  const es6ImportRegex = /import\s+(?:[\w*{}\s,]+\s+from\s+)?['"]([^'"]+)['"]/g;
+  let match;
+  while ((match = es6ImportRegex.exec(content)) !== null) {
+    const importPath = match[1];
+    if (importPath && !importPath.startsWith('@') && !importPath.startsWith('node:')) {
+      const resolved = resolveImportPath(importPath, sourceDir);
+      if (resolved) imports.push(resolved);
+    }
+  }
+
+  // Match CommonJS requires: require('path')
+  const cjsRequireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+  while ((match = cjsRequireRegex.exec(content)) !== null) {
+    const requirePath = match[1];
+    if (requirePath && !requirePath.startsWith('@') && !requirePath.startsWith('node:')) {
+      const resolved = resolveImportPath(requirePath, sourceDir);
+      if (resolved) imports.push(resolved);
+    }
+  }
+
+  return imports;
+}
+
+/** Resolve relative import path to absolute path */
+function resolveImportPath(importPath: string, sourceDir: string): string | null {
+  // Only handle relative imports
+  if (!importPath.startsWith('.')) return null;
+
+  let resolved = path.resolve(sourceDir, importPath);
+
+  // Try common extensions
+  const extensions = ['.ts', '.tsx', '.js', '.jsx', '/index.ts', '/index.tsx', '/index.js', '/index.jsx'];
+  for (const ext of extensions) {
+    const candidate = resolved + ext;
+    try {
+      // Check if file exists synchronously for performance
+      if (require('fs').existsSync(candidate)) {
+        return candidate;
+      }
+    } catch {
+      continue;
+    }
+  }
+
+  // If no extension worked, return the resolved path anyway
+  return resolved;
+}
+
+/** Find project root by looking for package.json */
+function findProjectRoot(startPath: string): string {
+  let currentDir = path.dirname(startPath);
+  const root = path.parse(currentDir).root;
+
+  while (currentDir !== root) {
+    const packageJsonPath = path.join(currentDir, 'package.json');
+    try {
+      if (require('fs').existsSync(packageJsonPath)) {
+        return currentDir;
+      }
+    } catch {
+      // Continue searching
+    }
+    currentDir = path.dirname(currentDir);
+  }
+
+  // Default to current directory if no package.json found
+  return path.dirname(startPath);
+}
+
+/** Enrich graph with real import edges (compensates for GNNBridge.extractImports stub) */
+async function enrichGraphWithEdges(graph: DependencyGraph): Promise<DependencyGraph> {
+  const newEdges: DependencyEdge[] = [...graph.edges];
+  const nodeIds = new Set(graph.nodes.map(n => n.id));
+
+  // For each node, parse its file and extract actual imports
+  for (const node of graph.nodes) {
+    try {
+      const content = await fs.readFile(node.id, 'utf-8');
+      const imports = extractImportsFromContent(content, node.id);
+
+      // Add edges for imports that point to other nodes in the graph
+      for (const importedFile of imports) {
+        if (nodeIds.has(importedFile) && node.id !== importedFile) {
+          // Check if edge already exists
+          const edgeExists = newEdges.some(
+            e => e.from === node.id && e.to === importedFile
+          );
+          if (!edgeExists) {
+            newEdges.push({
+              from: node.id,
+              to: importedFile,
+              type: 'import',
+              weight: 1,
+            });
+          }
+        }
+      }
+    } catch {
+      // Skip files that can't be read
+      continue;
+    }
+  }
+
+  return {
+    ...graph,
+    edges: newEdges,
+    metadata: {
+      ...graph.metadata,
+      totalEdges: newEdges.length,
+    },
+  };
 }
 
 function detectLayerViolations(
