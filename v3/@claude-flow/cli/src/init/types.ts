@@ -365,18 +365,18 @@ export const DEFAULT_INIT_OPTIONS: InitOptions = {
     all: false,
   },
   agents: {
-    core: true,
-    consensus: true,
-    github: true,
-    hiveMind: true,
-    sparc: true,
-    swarm: true,
-    browser: true,
-    v3: true,
-    optimization: true,
-    testing: true,
-    dualMode: false,  // Optional: enable with --dual flag
-    all: true,
+    core: true,           // Essential: coder, tester, reviewer, planner, researcher
+    consensus: false,     // Opt-in: byzantine, raft, gossip, etc.
+    github: true,         // Essential: pr-manager, issue-tracker work out of the box
+    hiveMind: false,      // Opt-in: queen-coordinator and hive workers
+    sparc: false,         // Opt-in: SPARC methodology agents
+    swarm: true,          // Essential: hierarchical-coordinator for multi-agent work
+    browser: false,       // Opt-in: browser automation agents
+    v3: false,            // Opt-in: V3-specific agents (most need MCP servers)
+    optimization: false,  // Opt-in: performance analysis agents
+    testing: false,       // Opt-in: additional testing agents
+    dualMode: false,      // Opt-in: Claude Code + Codex hybrid agents
+    all: false,           // Default to minimal set, not all 100+ agents
   },
   statusline: {
     enabled: true,
