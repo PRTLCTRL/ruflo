@@ -9,7 +9,12 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { createToolContext, semanticSearchTool, architectureAnalyzeTool } from '../src/mcp-tools.js';
+import { 
+  createToolContext, 
+  semanticSearchTool, 
+  architectureAnalyzeTool,
+  refactorImpactTool
+} from '../src/mcp-tools.js';
 import fs from 'fs/promises';
 import path from 'path';
 import os from 'os';
@@ -304,14 +309,14 @@ export function funcB() { return funcA(); }`
         changes: [
           {
             file: userFormPath,
-            type: 'modify',
+            type: 'modify' as const,
             details: { description: 'Update validation logic' },
           },
         ],
         depth: 3,
       };
 
-      const result = await architectureAnalyzeTool.handler(input, context);
+      const result = await refactorImpactTool.handler(input, context);
       const data = JSON.parse(result.content[0]?.text ?? '{}');
 
       expect(data.success).toBe(true);
