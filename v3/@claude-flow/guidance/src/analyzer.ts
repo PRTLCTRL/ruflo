@@ -607,32 +607,21 @@ interface HeadlessBenchmarkTask {
 
 class DefaultHeadlessExecutor implements IContentAwareExecutor {
   private contextContent: string | null = null;
+  private workDir: string | null = null;
+  private backupPath: string | null = null;
+  private hasSwapped = false;
 
   setContext(claudeMdContent: string): void {
     this.contextContent = claudeMdContent;
+    this.hasSwapped = false;
   }
 
   async execute(prompt: string, workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
-    const fs = await import('node:fs/promises');
-    const { join } = await import('node:path');
     const execFileAsync = promisify(execFile);
 
-    const claudeMdPath = join(workDir, 'CLAUDE.md');
-    const backupPath = join(workDir, '.CLAUDE.md.ab-backup');
-    let swapped = false;
-
-    if (this.contextContent !== null) {
-      try { await fs.copyFile(claudeMdPath, backupPath); } catch { /* no file to back up */ }
-
-      if (this.contextContent.length > 0) {
-        await fs.writeFile(claudeMdPath, this.contextContent, 'utf-8');
-      } else {
-        await fs.unlink(claudeMdPath).catch(() => {});
-      }
-      swapped = true;
-    }
+    await this.ensureContextApplied(workDir);
 
     try {
       const { stdout, stderr } = await execFileAsync(
@@ -643,16 +632,51 @@ class DefaultHeadlessExecutor implements IContentAwareExecutor {
       return { stdout, stderr, exitCode: 0 };
     } catch (error: any) {
       return { stdout: error.stdout ?? '', stderr: error.stderr ?? '', exitCode: error.code ?? 1 };
-    } finally {
-      if (swapped) {
-        try {
-          await fs.copyFile(backupPath, claudeMdPath);
-          await fs.unlink(backupPath);
-        } catch {
-          await fs.unlink(claudeMdPath).catch(() => {});
-        }
-      }
     }
+  }
+
+  private async ensureContextApplied(workDir: string): Promise<void> {
+    if (this.hasSwapped || this.contextContent === null) {
+      return;
+    }
+
+    const fs = await import('node:fs/promises');
+    const { join } = await import('node:path');
+
+    this.workDir = workDir;
+    const claudeMdPath = join(workDir, 'CLAUDE.md');
+    this.backupPath = join(workDir, '.CLAUDE.md.ab-backup');
+
+    try { await fs.copyFile(claudeMdPath, this.backupPath); } catch { /* no file to back up */ }
+
+    if (this.contextContent.length > 0) {
+      await fs.writeFile(claudeMdPath, this.contextContent, 'utf-8');
+    } else {
+      await fs.unlink(claudeMdPath).catch(() => {});
+    }
+
+    this.hasSwapped = true;
+  }
+
+  async cleanup(): Promise<void> {
+    if (!this.hasSwapped || !this.workDir || !this.backupPath) {
+      return;
+    }
+
+    const fs = await import('node:fs/promises');
+    const { join } = await import('node:path');
+    const claudeMdPath = join(this.workDir, 'CLAUDE.md');
+
+    try {
+      await fs.copyFile(this.backupPath, claudeMdPath);
+      await fs.unlink(this.backupPath);
+    } catch {
+      await fs.unlink(claudeMdPath).catch(() => {});
+    }
+
+    this.hasSwapped = false;
+    this.workDir = null;
+    this.backupPath = null;
   }
 }
 
@@ -2839,49 +2863,55 @@ async function runABConfig(
 ): Promise<ABTaskResult[]> {
   const results: ABTaskResult[] = [];
 
-  for (const task of tasks) {
-    const start = Date.now();
-    try {
-      const { stdout } = await executor.execute(task.prompt, workDir);
-      const output = stdout.slice(0, 4000);
+  try {
+    for (const task of tasks) {
+      const start = Date.now();
+      try {
+        const { stdout } = await executor.execute(task.prompt, workDir);
+        const output = stdout.slice(0, 4000);
 
-      const assertionResults = task.assertions.map(a => ({
-        assertion: a,
-        ...evaluateAssertion(a, output),
-      }));
-
-      const violations = simulateGates(output, task.gatePatterns);
-      const hasHumanIntervention = violations.some(v => v.severity === 'critical');
-
-      results.push({
-        taskId: task.id,
-        taskClass: task.taskClass,
-        passed: assertionResults.every(r => r.passed),
-        assertionResults,
-        violations,
-        humanIntervention: hasHumanIntervention,
-        toolCalls: estimateToolCalls(output),
-        tokenSpend: estimateTokenSpend(task.prompt, output),
-        output,
-        durationMs: Date.now() - start,
-      });
-    } catch {
-      results.push({
-        taskId: task.id,
-        taskClass: task.taskClass,
-        passed: false,
-        assertionResults: task.assertions.map(a => ({
+        const assertionResults = task.assertions.map(a => ({
           assertion: a,
+          ...evaluateAssertion(a, output),
+        }));
+
+        const violations = simulateGates(output, task.gatePatterns);
+        const hasHumanIntervention = violations.some(v => v.severity === 'critical');
+
+        results.push({
+          taskId: task.id,
+          taskClass: task.taskClass,
+          passed: assertionResults.every(r => r.passed),
+          assertionResults,
+          violations,
+          humanIntervention: hasHumanIntervention,
+          toolCalls: estimateToolCalls(output),
+          tokenSpend: estimateTokenSpend(task.prompt, output),
+          output,
+          durationMs: Date.now() - start,
+        });
+      } catch {
+        results.push({
+          taskId: task.id,
+          taskClass: task.taskClass,
           passed: false,
-          detail: 'Execution failed',
-        })),
-        violations: [],
-        humanIntervention: true,
-        toolCalls: 0,
-        tokenSpend: 0,
-        output: '',
-        durationMs: Date.now() - start,
-      });
+          assertionResults: task.assertions.map(a => ({
+            assertion: a,
+            passed: false,
+            detail: 'Execution failed',
+          })),
+          violations: [],
+          humanIntervention: true,
+          toolCalls: 0,
+          tokenSpend: 0,
+          output: '',
+          durationMs: Date.now() - start,
+        });
+      }
+    }
+  } finally {
+    if ('cleanup' in executor && typeof (executor as any).cleanup === 'function') {
+      await (executor as any).cleanup();
     }
   }
 
