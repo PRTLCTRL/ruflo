@@ -2464,5 +2464,17 @@ describe('abBenchmark', () => {
       expect(report.configB.taskResults).toHaveLength(1);
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
+
+    it('throws error when executor is not content-aware', async () => {
+      class BasicExecutor implements IHeadlessExecutor {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'result', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor: new BasicExecutor() }),
+      ).rejects.toThrow(/content-aware executor/i);
+    });
   });
 });
