@@ -33,6 +33,7 @@
     "v3/@claude-flow/guidance/package.json",
     ".claude-plugin/**",
     ".claude/**",
+    "!.claude/agents-optional/**",
     "!.claude/**/*.db",
     "!.claude/**/*.map",
     "README.md",
