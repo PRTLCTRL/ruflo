@@ -2075,6 +2075,40 @@ class ABDifferentialExecutor implements IContentAwareExecutor {
 }
 
 describe('abBenchmark', () => {
+  describe('executor content-awareness validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        });
+      }).rejects.toThrow(/content-aware executor/i);
+    });
+
+    it('accepts content-aware executor', async () => {
+      const executor = new ABDifferentialExecutor();
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor,
+      });
+      expect(report).toBeDefined();
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+
+    it('accepts default executor (which is content-aware)', async () => {
+      // Default executor should be content-aware and pass validation
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD);
+      expect(report).toBeDefined();
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+  });
+
   describe('task inventory', () => {
     it('provides 20 default tasks', () => {
       const tasks = getDefaultABTasks();
