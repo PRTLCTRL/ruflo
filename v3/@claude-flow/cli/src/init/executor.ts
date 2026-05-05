@@ -95,33 +95,62 @@ const COMMANDS_MAP: Record<string, string[]> = {
 
 /**
  * Agents to copy based on configuration
+ * 
+ * IMPORTANT: Only include agent categories that work out-of-the-box without
+ * additional MCP server dependencies. Non-functional agents have been removed
+ * to reduce context bloat (issue #1504).
+ * 
+ * Removed categories:
+ * - sublinear: Requires mcp__sublinear-time-solver (not included)
+ * - flowNexus: Requires mcp__flow-nexus (not included)
+ * - payments: Requires mcp__agentic-payments (not included)
+ * - templates: Rarely used template files
+ * - data: Contains only ml/data-ml-model which is niche
+ * - specialized: Contains duplicates of architecture/development agents
+ * - documentation: Duplicates of docs agents in other categories
+ * - devops: Duplicates of ci-cd agents
+ * - architecture: Duplicates in analysis
  */
 const AGENTS_MAP: Record<string, string[]> = {
-  core: ['core'],
-  consensus: ['consensus'],
-  github: ['github'],
-  hiveMind: ['hive-mind'],
-  sparc: ['sparc'],
+  // Core development agents (most commonly used)
+  core: ['core'],  // coder, reviewer, tester, planner, researcher
+  
+  // Swarm & coordination
   swarm: ['swarm'],
-  browser: ['browser'],  // agent-browser integration
-  dualMode: ['dual-mode'],  // Claude Code + Codex hybrid execution
-  // V3-specific agents
-  v3: ['v3'],
-  optimization: ['optimization'],
-  templates: ['templates'],
+  hiveMind: ['hive-mind'],
+  
+  // GitHub integration (functional with gh CLI)
+  github: ['github'],
+  
+  // SPARC methodology
+  sparc: ['sparc'],
+  
+  // Consensus algorithms
+  consensus: ['consensus'],
+  
+  // Development specialists
+  analysis: ['analysis'],  // code-analyzer, code-review
+  development: ['development'],  // backend-dev
+  
+  // V3 specialized agents (work without extra MCPs)
+  v3: ['v3'],  // security-architect, security-auditor, memory-specialist, etc.
+  
+  // Testing infrastructure
   testing: ['testing'],
-  sublinear: ['sublinear'],
-  flowNexus: ['flow-nexus'],
-  analysis: ['analysis'],
-  architecture: ['architecture'],
-  development: ['development'],
-  devops: ['devops'],
-  documentation: ['documentation'],
-  specialized: ['specialized'],
+  
+  // Goal planning (sublinear algorithms but client-side only)
   goal: ['goal'],
+  
+  // SONA learning
   sona: ['sona'],
-  payments: ['payments'],
-  data: ['data'],
+  
+  // Dual-mode (Claude Code + Codex hybrid)
+  dualMode: ['dual-mode'],
+  
+  // Browser automation
+  browser: ['browser'],
+  
+  // Custom user agents
   custom: ['custom'],
 };
 
