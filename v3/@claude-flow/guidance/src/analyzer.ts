@@ -3131,6 +3131,24 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // ── Validate executor can isolate configs ──────────────────────────
+  // If executor is not content-aware, it cannot swap CLAUDE.md between
+  // Config A (no guidance) and Config B (with guidance), making the delta
+  // architecturally zero. Abort to avoid wasting tokens/time.
+  if (!contentAware) {
+    throw new Error(
+      'ab-test requires a content-aware executor that implements setContext().\n\n' +
+      'The provided executor cannot isolate Config A from on-disk CLAUDE.md.\n' +
+      'Without this capability, both configs read the same file, producing a\n' +
+      'guaranteed zero delta while wasting ~$23 and 40+ minutes.\n\n' +
+      'Options:\n' +
+      '  1. Use the default executor (already content-aware via file swapping)\n' +
+      '  2. Pass a custom IContentAwareExecutor with setContext() implemented\n' +
+      '  3. Implement setContext() to inject content as --append-system-prompt\n\n' +
+      'See: https://github.com/ruvnet/ruflo/issues/1652'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');
