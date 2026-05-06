@@ -590,6 +590,8 @@ export interface IHeadlessExecutor {
 export interface IContentAwareExecutor extends IHeadlessExecutor {
   /** Set the CLAUDE.md content that the executor should use as behavioral context */
   setContext(claudeMdContent: string): void;
+  /** Optional cleanup to restore original CLAUDE.md after benchmark completes */
+  cleanup?(): Promise<void>;
 }
 
 /** Type guard for content-aware executors */
@@ -607,6 +609,8 @@ interface HeadlessBenchmarkTask {
 
 class DefaultHeadlessExecutor implements IContentAwareExecutor {
   private contextContent: string | null = null;
+  private originalContent: string | null = null;
+  private workDirSwapped: string | null = null;
 
   setContext(claudeMdContent: string): void {
     this.contextContent = claudeMdContent;
@@ -620,18 +624,21 @@ class DefaultHeadlessExecutor implements IContentAwareExecutor {
     const execFileAsync = promisify(execFile);
 
     const claudeMdPath = join(workDir, 'CLAUDE.md');
-    const backupPath = join(workDir, '.CLAUDE.md.ab-backup');
-    let swapped = false;
 
-    if (this.contextContent !== null) {
-      try { await fs.copyFile(claudeMdPath, backupPath); } catch { /* no file to back up */ }
+    // Swap CLAUDE.md ONCE per setContext() call, persist across all execute() calls
+    if (this.contextContent !== null && this.workDirSwapped !== workDir) {
+      try {
+        this.originalContent = await fs.readFile(claudeMdPath, 'utf-8');
+      } catch {
+        this.originalContent = null;
+      }
 
       if (this.contextContent.length > 0) {
         await fs.writeFile(claudeMdPath, this.contextContent, 'utf-8');
       } else {
         await fs.unlink(claudeMdPath).catch(() => {});
       }
-      swapped = true;
+      this.workDirSwapped = workDir;
     }
 
     try {
@@ -643,16 +650,22 @@ class DefaultHeadlessExecutor implements IContentAwareExecutor {
       return { stdout, stderr, exitCode: 0 };
     } catch (error: any) {
       return { stdout: error.stdout ?? '', stderr: error.stderr ?? '', exitCode: error.code ?? 1 };
-    } finally {
-      if (swapped) {
-        try {
-          await fs.copyFile(backupPath, claudeMdPath);
-          await fs.unlink(backupPath);
-        } catch {
-          await fs.unlink(claudeMdPath).catch(() => {});
-        }
+    }
+  }
+
+  async cleanup(): Promise<void> {
+    if (this.workDirSwapped && this.originalContent !== null) {
+      const fs = await import('node:fs/promises');
+      const { join } = await import('node:path');
+      const claudeMdPath = join(this.workDirSwapped, 'CLAUDE.md');
+      try {
+        await fs.writeFile(claudeMdPath, this.originalContent, 'utf-8');
+      } catch {
+        // Ignore cleanup errors
       }
     }
+    this.workDirSwapped = null;
+    this.originalContent = null;
   }
 }
 
@@ -3137,6 +3150,11 @@ export async function abBenchmark(
   const configAResults = await runABConfig(executor, tasks, workDir);
   const configAMetrics = computeABMetrics(configAResults);
 
+  // Restore original CLAUDE.md before Config B
+  if ('cleanup' in executor && typeof executor.cleanup === 'function') {
+    await executor.cleanup();
+  }
+
   // ── Config B: With Phase 1 control plane ────────────────────────────
   // Hook wiring: setContext with guidance content
   // Retriever injection: the executor gets full guidance context
@@ -3145,6 +3163,11 @@ export async function abBenchmark(
   if (contentAware) executor.setContext(claudeMdContent);
   const configBResults = await runABConfig(executor, tasks, workDir);
   const configBMetrics = computeABMetrics(configBResults);
+
+  // Restore original CLAUDE.md after benchmark
+  if ('cleanup' in executor && typeof executor.cleanup === 'function') {
+    await executor.cleanup();
+  }
 
   // ── Compute deltas ──────────────────────────────────────────────────
   const compositeDelta = Math.round(
