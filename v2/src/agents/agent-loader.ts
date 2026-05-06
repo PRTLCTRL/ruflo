@@ -120,9 +120,10 @@ class AgentLoader {
     }
 
     // Find all .md files in the agents directory
+    // Exclude optional/ directory which contains agents requiring external MCP servers
     const agentFiles = await glob('**/*.md', {
       cwd: agentsDir,
-      ignore: ['**/README.md', '**/MIGRATION_SUMMARY.md'],
+      ignore: ['**/README.md', '**/MIGRATION_SUMMARY.md', '**/optional/**'],
       absolute: true,
     });
 
