@@ -2118,6 +2118,32 @@ describe('abBenchmark', () => {
     });
   });
 
+  describe('executor validation', () => {
+    it('throws error when executor lacks setContext', async () => {
+      const nonContentAwareExecutor = new CompliantExecutor();
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        });
+      }).rejects.toThrow(/requires a content-aware executor/);
+    });
+
+    it('error message explains the problem and provides options', async () => {
+      const nonContentAwareExecutor = new CompliantExecutor();
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.message).toContain('setContext()');
+        expect(error.message).toContain('IContentAwareExecutor');
+        expect(error.message).toContain('zero delta');
+        expect(error.message).toContain('Options:');
+      }
+    });
+  });
+
   describe('A/B execution with differential executor', () => {
     it('returns a complete ABReport', async () => {
       const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {

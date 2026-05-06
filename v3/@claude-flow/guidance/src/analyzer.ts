@@ -3131,6 +3131,23 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // ── Validate executor can isolate configs ──────────────────────────
+  // If executor is not content-aware, it cannot swap CLAUDE.md between
+  // Config A (no guidance) and Config B (with guidance), making the delta
+  // architecturally zero. Abort to avoid wasting tokens/time.
+  if (!contentAware) {
+    throw new Error(
+      'ab-test requires a content-aware executor that can isolate Config A from on-disk CLAUDE.md.\n' +
+      'The provided executor does not implement setContext().\n\n' +
+      'Options:\n' +
+      '  1. Pass an IContentAwareExecutor that implements setContext()\n' +
+      '  2. Use the default executor (already content-aware)\n' +
+      '  3. Implement a custom executor with file-swapping logic\n\n' +
+      'Running with a non-content-aware executor would produce a guaranteed zero delta\n' +
+      'by reading the same CLAUDE.md for both configs, wasting ~$23 and 40+ minutes.'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');
