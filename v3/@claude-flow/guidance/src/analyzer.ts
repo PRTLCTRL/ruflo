@@ -607,9 +607,11 @@ interface HeadlessBenchmarkTask {
 
 class DefaultHeadlessExecutor implements IContentAwareExecutor {
   private contextContent: string | null = null;
+  private contextApplied = false;
 
   setContext(claudeMdContent: string): void {
     this.contextContent = claudeMdContent;
+    this.contextApplied = false; // Reset flag when context changes
   }
 
   async execute(prompt: string, workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
@@ -621,9 +623,9 @@ class DefaultHeadlessExecutor implements IContentAwareExecutor {
 
     const claudeMdPath = join(workDir, 'CLAUDE.md');
     const backupPath = join(workDir, '.CLAUDE.md.ab-backup');
-    let swapped = false;
 
-    if (this.contextContent !== null) {
+    // Only swap the file once per setContext() call
+    if (this.contextContent !== null && !this.contextApplied) {
       try { await fs.copyFile(claudeMdPath, backupPath); } catch { /* no file to back up */ }
 
       if (this.contextContent.length > 0) {
@@ -631,7 +633,7 @@ class DefaultHeadlessExecutor implements IContentAwareExecutor {
       } else {
         await fs.unlink(claudeMdPath).catch(() => {});
       }
-      swapped = true;
+      this.contextApplied = true;
     }
 
     try {
@@ -642,17 +644,11 @@ class DefaultHeadlessExecutor implements IContentAwareExecutor {
       );
       return { stdout, stderr, exitCode: 0 };
     } catch (error: any) {
-      return { stdout: error.stdout ?? '', stderr: error.stderr ?? '', exitCode: error.code ?? 1 };
-    } finally {
-      if (swapped) {
-        try {
-          await fs.copyFile(backupPath, claudeMdPath);
-          await fs.unlink(backupPath);
-        } catch {
-          await fs.unlink(claudeMdPath).catch(() => {});
-        }
-      }
+      return { stdout, error.stdout ?? '', stderr: error.stderr ?? '', exitCode: error.code ?? 1 };
     }
+    // Note: We no longer restore the backup after each execute() call.
+    // This allows multiple execute() calls to share the same swapped context.
+    // The backup remains at .CLAUDE.md.ab-backup for manual cleanup if needed.
   }
 }
 
