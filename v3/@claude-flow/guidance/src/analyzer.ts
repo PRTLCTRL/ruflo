@@ -605,6 +605,16 @@ interface HeadlessBenchmarkTask {
   expectPresent: string[];
 }
 
+/**
+ * Default headless executor that swaps CLAUDE.md files to enable A/B testing.
+ * 
+ * Fixes issue #1652: Previously, the default executor couldn't actually swap CLAUDE.md
+ * between Config A (no guidance) and Config B (with guidance), resulting in guaranteed
+ * zero-delta results. Now implements IContentAwareExecutor and physically swaps the
+ * CLAUDE.md file during execution using a backup/restore pattern.
+ * 
+ * @see https://github.com/ruvnet/ruflo/issues/1652
+ */
 class DefaultHeadlessExecutor implements IContentAwareExecutor {
   private contextContent: string | null = null;
 

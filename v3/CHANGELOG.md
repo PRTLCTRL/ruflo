@@ -7,6 +7,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0-alpha.3] - 2026-05-07
+
+### 🐛 Bug Fixes
+
+#### @claude-flow/guidance
+
+- **Fixed A/B testing zero-delta bug ([#1652](https://github.com/ruvnet/ruflo/issues/1652))**
+  - `DefaultHeadlessExecutor` now properly implements `IContentAwareExecutor`
+  - Physically swaps CLAUDE.md files during A/B benchmarking using backup/restore pattern
+  - Config A (no guidance) now correctly runs without CLAUDE.md
+  - Config B (with guidance) properly uses provided CLAUDE.md content
+  - Eliminates guaranteed zero-delta results that wasted $23+ per benchmark
+  - Added tests verifying content-aware executor implementation
+
+---
+
+## [3.0.0-alpha.2] - 2026-01-15
+
+### 🔧 Internal Changes
+
+- Updated dependencies
+- Minor bug fixes and improvements
+
+---
+
 ## [3.0.0-alpha.1] - 2026-01-04
 
 ### 🚀 Major Changes
