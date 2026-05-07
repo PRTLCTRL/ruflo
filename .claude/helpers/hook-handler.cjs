@@ -132,11 +132,18 @@ const handlers = {
     var dangerous = ['rm -rf /', 'format c:', 'del /s /q c:\\', ':(){:|:&};:'];
     for (var i = 0; i < dangerous.length; i++) {
       if (cmd.includes(dangerous[i])) {
-        console.error('[BLOCKED] Dangerous command detected: ' + dangerous[i]);
+        console.log(JSON.stringify({
+          tool_input: toolInput,
+          decision: 'deny',
+          reason: 'Dangerous command detected: ' + dangerous[i]
+        }));
         process.exit(1);
       }
     }
-    console.log('[OK] Command validated');
+    console.log(JSON.stringify({
+      tool_input: toolInput,
+      decision: 'allow'
+    }));
   },
 
   'post-edit': () => {
@@ -150,7 +157,7 @@ const handlers = {
         intelligence.recordEdit(file);
       } catch (e) { /* non-fatal */ }
     }
-    console.log('[OK] Edit recorded');
+    console.log(JSON.stringify({ status: 'ok', message: 'Edit recorded' }));
   },
 
   'session-restore': async () => {
@@ -246,17 +253,32 @@ if (command && handlers[command]) {
     try {
       await Promise.resolve(handlers[command]());
     } catch (e) {
-      console.log('[WARN] Hook ' + command + ' encountered an error: ' + e.message);
+      if (command === 'pre-bash' || command === 'pre-command') {
+        console.log(JSON.stringify({
+          tool_input: toolInput,
+          decision: 'allow',
+          reason: 'Hook error (non-fatal): ' + e.message
+        }));
+      } else {
+        console.log(JSON.stringify({ status: 'warning', message: 'Hook ' + command + ' encountered an error: ' + e.message }));
+      }
     }
   } else if (command) {
-    console.log('[OK] Hook: ' + command);
+    if (command === 'pre-bash' || command === 'pre-command') {
+      console.log(JSON.stringify({
+        tool_input: toolInput || {},
+        decision: 'allow'
+      }));
+    } else {
+      console.log(JSON.stringify({ status: 'ok', hook: command }));
+    }
   } else {
-    console.log('Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>');
+    console.log(JSON.stringify({ status: 'error', message: 'Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>' }));
   }
 }
 
 main().catch(function(e) {
-  console.log('[WARN] Hook handler error: ' + e.message);
+  console.log(JSON.stringify({ status: 'error', message: 'Hook handler error: ' + e.message }));
 }).finally(function() {
   // Ensure clean exit for Claude Code hooks
   process.exit(0);
