@@ -132,11 +132,11 @@ const handlers = {
     var dangerous = ['rm -rf /', 'format c:', 'del /s /q c:\\', ':(){:|:&};:'];
     for (var i = 0; i < dangerous.length; i++) {
       if (cmd.includes(dangerous[i])) {
-        console.error('[BLOCKED] Dangerous command detected: ' + dangerous[i]);
+        console.log(JSON.stringify({ status: 'blocked', reason: 'Dangerous command detected: ' + dangerous[i] }));
         process.exit(1);
       }
     }
-    console.log('[OK] Command validated');
+    console.log(JSON.stringify({ status: 'ok', message: 'Command validated' }));
   },
 
   'post-edit': () => {
@@ -246,10 +246,18 @@ if (command && handlers[command]) {
     try {
       await Promise.resolve(handlers[command]());
     } catch (e) {
-      console.log('[WARN] Hook ' + command + ' encountered an error: ' + e.message);
+      if (command === 'pre-bash') {
+        console.log(JSON.stringify({ status: 'error', message: e.message }));
+      } else {
+        console.log('[WARN] Hook ' + command + ' encountered an error: ' + e.message);
+      }
     }
   } else if (command) {
-    console.log('[OK] Hook: ' + command);
+    if (command === 'pre-bash') {
+      console.log(JSON.stringify({ status: 'ok', message: 'Unknown command' }));
+    } else {
+      console.log('[OK] Hook: ' + command);
+    }
   } else {
     console.log('Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>');
   }
