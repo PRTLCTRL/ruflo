@@ -132,11 +132,11 @@ const handlers = {
     var dangerous = ['rm -rf /', 'format c:', 'del /s /q c:\\', ':(){:|:&};:'];
     for (var i = 0; i < dangerous.length; i++) {
       if (cmd.includes(dangerous[i])) {
-        console.error('[BLOCKED] Dangerous command detected: ' + dangerous[i]);
+        console.log(JSON.stringify({ status: 'blocked', reason: 'Dangerous command detected: ' + dangerous[i] }));
         process.exit(1);
       }
     }
-    console.log('[OK] Command validated');
+    console.log(JSON.stringify({ status: 'ok', message: 'Command validated' }));
   },
 
   'post-edit': () => {
@@ -150,7 +150,7 @@ const handlers = {
         intelligence.recordEdit(file);
       } catch (e) { /* non-fatal */ }
     }
-    console.log('[OK] Edit recorded');
+    console.log(JSON.stringify({ status: 'ok', message: 'Edit recorded' }));
   },
 
   'session-restore': async () => {
@@ -195,9 +195,9 @@ const handlers = {
     }
     if (router && router.routeTask && prompt) {
       var result = router.routeTask(prompt);
-      console.log('[INFO] Task routed to: ' + result.agent + ' (confidence: ' + result.confidence + ')');
+      console.log(JSON.stringify({ status: 'ok', agent: result.agent, confidence: result.confidence }));
     } else {
-      console.log('[OK] Task started');
+      console.log(JSON.stringify({ status: 'ok', message: 'Task started' }));
     }
   },
 
@@ -207,7 +207,7 @@ const handlers = {
         intelligence.feedback(true);
       } catch (e) { /* non-fatal */ }
     }
-    console.log('[OK] Task completed');
+    console.log(JSON.stringify({ status: 'ok', message: 'Task completed' }));
   },
 
   'compact-manual': () => {
@@ -230,7 +230,7 @@ const handlers = {
   },
 
   'status': () => {
-    console.log('[OK] Status check');
+    console.log(JSON.stringify({ status: 'ok', message: 'Status check' }));
   },
 
   'stats': () => {
@@ -246,17 +246,17 @@ if (command && handlers[command]) {
     try {
       await Promise.resolve(handlers[command]());
     } catch (e) {
-      console.log('[WARN] Hook ' + command + ' encountered an error: ' + e.message);
+      console.log(JSON.stringify({ status: 'warn', message: 'Hook ' + command + ' encountered an error: ' + e.message }));
     }
   } else if (command) {
-    console.log('[OK] Hook: ' + command);
+    console.log(JSON.stringify({ status: 'ok', hook: command }));
   } else {
-    console.log('Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>');
+    console.log(JSON.stringify({ status: 'error', message: 'Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>' }));
   }
 }
 
 main().catch(function(e) {
-  console.log('[WARN] Hook handler error: ' + e.message);
+  console.log(JSON.stringify({ status: 'warn', message: 'Hook handler error: ' + e.message }));
 }).finally(function() {
   // Ensure clean exit for Claude Code hooks
   process.exit(0);
