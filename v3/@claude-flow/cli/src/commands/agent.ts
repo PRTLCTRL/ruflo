@@ -48,22 +48,18 @@ function updateSwarmActivityMetrics(agentCountDelta: number): void {
 }
 
 // Available agent types with descriptions
+// Aligned with AgentType from @claude-flow/shared
 const AGENT_TYPES = [
   { value: 'coder', label: 'Coder', hint: 'Code development with neural patterns' },
-  { value: 'researcher', label: 'Researcher', hint: 'Research with web access and data analysis' },
-  { value: 'tester', label: 'Tester', hint: 'Comprehensive testing with automation' },
   { value: 'reviewer', label: 'Reviewer', hint: 'Code review with security and quality checks' },
+  { value: 'tester', label: 'Tester', hint: 'Comprehensive testing with automation' },
+  { value: 'researcher', label: 'Researcher', hint: 'Research with web access and data analysis' },
+  { value: 'planner', label: 'Planner', hint: 'Task planning and strategy' },
   { value: 'architect', label: 'Architect', hint: 'System design with enterprise patterns' },
   { value: 'coordinator', label: 'Coordinator', hint: 'Multi-agent orchestration and workflow' },
-  { value: 'analyst', label: 'Analyst', hint: 'Performance analysis and optimization' },
-  { value: 'optimizer', label: 'Optimizer', hint: 'Performance optimization and bottleneck analysis' },
-  { value: 'security-architect', label: 'Security Architect', hint: 'Security architecture and threat modeling' },
-  { value: 'security-auditor', label: 'Security Auditor', hint: 'CVE remediation and security testing' },
-  { value: 'memory-specialist', label: 'Memory Specialist', hint: 'AgentDB unification (150x-12,500x faster)' },
-  { value: 'swarm-specialist', label: 'Swarm Specialist', hint: 'Unified coordination engine' },
-  { value: 'performance-engineer', label: 'Performance Engineer', hint: '2.49x-7.47x optimization targets' },
-  { value: 'core-architect', label: 'Core Architect', hint: 'Domain-driven design restructure' },
-  { value: 'test-architect', label: 'Test Architect', hint: 'TDD London School methodology' }
+  { value: 'security', label: 'Security', hint: 'Security architecture and threat modeling' },
+  { value: 'performance', label: 'Performance', hint: 'Performance optimization and bottleneck analysis' },
+  { value: 'custom', label: 'Custom', hint: 'Custom agent configuration' }
 ];
 
 // Agent spawn subcommand
@@ -1035,14 +1031,15 @@ export const agentCommand: Command = {
 function getAgentCapabilities(type: string): string[] {
   const capabilities: Record<string, string[]> = {
     coder: ['code-generation', 'refactoring', 'debugging', 'testing'],
-    researcher: ['web-search', 'data-analysis', 'summarization', 'citation'],
-    tester: ['unit-testing', 'integration-testing', 'coverage-analysis', 'automation'],
     reviewer: ['code-review', 'security-audit', 'quality-check', 'documentation'],
+    tester: ['unit-testing', 'integration-testing', 'coverage-analysis', 'automation'],
+    researcher: ['web-search', 'data-analysis', 'summarization', 'citation'],
+    planner: ['task-planning', 'strategy', 'resource-allocation', 'scheduling'],
     architect: ['system-design', 'pattern-analysis', 'scalability', 'documentation'],
     coordinator: ['task-orchestration', 'agent-management', 'workflow-control'],
-    'security-architect': ['threat-modeling', 'security-patterns', 'compliance', 'audit'],
-    'memory-specialist': ['vector-search', 'agentdb', 'caching', 'optimization'],
-    'performance-engineer': ['benchmarking', 'profiling', 'optimization', 'monitoring']
+    security: ['threat-modeling', 'security-patterns', 'compliance', 'audit'],
+    performance: ['benchmarking', 'profiling', 'optimization', 'monitoring'],
+    custom: ['configurable', 'flexible', 'extensible']
   };
 
   return capabilities[type] || ['general'];

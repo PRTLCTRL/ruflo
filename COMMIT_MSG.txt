@@ -1,0 +1,26 @@
+fix: remove 20 non-functional agent definitions to reduce context bloat
+
+Removed 136KB (~34K tokens) of agent definitions that reference non-existent 
+MCP servers, saving ~$0.50 per conversation in wasted context costs.
+
+Changes:
+- Removed 5 sublinear/ agents (require mcp__sublinear-time-solver__)
+- Removed 1 payments/ agent (requires mcp__agentic-payments__)
+- Removed 9 flow-nexus/ agents (require mcp__flow-nexus__)
+- Removed 4 duplicate agent files
+- Removed 1 duplicate documentation file
+
+Impact:
+- Agent files: 98 → 78 (-20%)
+- Context size: ~300K → ~266K tokens (-34K)
+- Cost per conversation: $4.50 → $4.00 (-11% on Opus)
+
+All core functional agents remain:
+- Core dev (5): coder, tester, reviewer, researcher, planner
+- Swarm (3): hierarchical, mesh, adaptive coordinators
+- SPARC (4): specification, pseudocode, architecture, refinement
+- GitHub (13): pr-manager, issue-tracker, code-review-swarm, etc.
+- V3 (16): security-auditor, memory-specialist, performance-engineer, etc.
+- Templates (9): orchestrator-task, sparc-coordinator, etc.
+
+Fixes #1504
