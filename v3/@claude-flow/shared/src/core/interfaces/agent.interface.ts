@@ -19,8 +19,17 @@ export type AgentType =
   | 'planner'
   | 'architect'
   | 'coordinator'
+  | 'analyst'
+  | 'optimizer'
   | 'security'
+  | 'security-architect'
+  | 'security-auditor'
   | 'performance'
+  | 'performance-engineer'
+  | 'memory-specialist'
+  | 'swarm-specialist'
+  | 'core-architect'
+  | 'test-architect'
   | 'custom';
 
 /**
