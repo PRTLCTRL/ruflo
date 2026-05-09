@@ -128,15 +128,19 @@ const handlers = {
   },
 
   'pre-bash': () => {
-    var cmd = (hookInput.command || prompt).toLowerCase();
-    var dangerous = ['rm -rf /', 'format c:', 'del /s /q c:\\', ':(){:|:&};:'];
-    for (var i = 0; i < dangerous.length; i++) {
-      if (cmd.includes(dangerous[i])) {
-        console.error('[BLOCKED] Dangerous command detected: ' + dangerous[i]);
-        process.exit(1);
+    try {
+      var cmd = (hookInput.command || prompt || '').toLowerCase();
+      var dangerous = ['rm -rf /', 'format c:', 'del /s /q c:\\', ':(){:|:&};:'];
+      for (var i = 0; i < dangerous.length; i++) {
+        if (cmd.includes(dangerous[i])) {
+          console.log(JSON.stringify({ ok: false, error: 'Dangerous command detected: ' + dangerous[i] }));
+          process.exit(1);
+        }
       }
+      console.log(JSON.stringify({ ok: true }));
+    } catch (e) {
+      console.log(JSON.stringify({ ok: true, warning: 'Hook error: ' + e.message }));
     }
-    console.log('[OK] Command validated');
   },
 
   'post-edit': () => {

@@ -21,9 +21,6 @@
     "@types/bcrypt": "^5.0.2",
     "vitest": "^4.0.16"
   },
-  "overrides": {
-    "tar": ">=7.5.11"
-  },
   "publishConfig": {
     "access": "public",
     "tag": "v3alpha"
