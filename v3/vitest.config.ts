@@ -80,14 +80,13 @@ export default defineConfig({
     // Reporter configuration
     reporters: ['default'],
 
-    // Parallel execution
+    // Parallel execution (Vitest 4 syntax)
     pool: 'threads',
-    poolOptions: {
-      threads: {
-        singleThread: false,
-        isolate: true,
-      },
-    },
+    poolOptions: undefined, // Removed in Vitest 4
+    
+    // Vitest 4: poolOptions moved to top-level
+    isolate: true,
+    singleThread: false,
 
     // Globals for easier testing
     globals: true,
