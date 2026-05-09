@@ -161,3 +161,4 @@ hive-mind-prompt-*.txt
 .env
 .env.local
 .env.*.local
+v3/agentdb.rvf

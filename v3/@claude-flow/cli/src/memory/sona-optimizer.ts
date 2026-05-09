@@ -247,6 +247,7 @@ export class SONAOptimizer {
   private async loadSonaEngine(): Promise<void> {
     if (this.sonaEngine !== undefined) return; // already attempted
     try {
+      // @ts-ignore - Optional external dependency, gracefully handled
       const sona: any = await import('@ruvector/sona');
       const EngineCtor = sona.SonaEngine || sona.default?.SonaEngine;
       if (EngineCtor) {
