@@ -44,6 +44,7 @@
 *.sqlite
 *.sqlite-journal
 *.sqlite-wal
+*.rvf
 *.swo
 *.swp
 *.temp
