@@ -40,7 +40,7 @@ Lead (you) ←→ architect ←→ developer ←→ tester ←→ reviewer
 Agent({ prompt: "Research the codebase. SendMessage findings to 'architect'.",
   subagent_type: "researcher", name: "researcher", run_in_background: true })
 Agent({ prompt: "Wait for 'researcher'. Design solution. SendMessage to 'coder'.",
-  subagent_type: "system-architect", name: "architect", run_in_background: true })
+  subagent_type: "architect", name: "architect", run_in_background: true })
 Agent({ prompt: "Wait for 'architect'. Implement it. SendMessage to 'tester'.",
   subagent_type: "coder", name: "coder", run_in_background: true })
 Agent({ prompt: "Wait for 'coder'. Write tests. SendMessage results to 'reviewer'.",
