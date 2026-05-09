@@ -11,7 +11,8 @@
   },
   "scripts": {
     "test": "vitest run",
-    "build": "tsc"
+    "build": "tsc",
+    "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",
@@ -20,9 +21,6 @@
   "devDependencies": {
     "@types/bcrypt": "^5.0.2",
     "vitest": "^4.0.16"
-  },
-  "overrides": {
-    "tar": "7.5.13"
   },
   "publishConfig": {
     "access": "public",
