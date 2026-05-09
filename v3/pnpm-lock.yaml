@@ -8352,6 +8352,7 @@ packages:
 
   /ecdsa-sig-formatter@1.0.11:
     resolution: {integrity: sha512-nagl3RYrbNv6kQkeJIpt6NJZy8twLB/2vtz6yN9Z4vRKHN4/QZJIEbqohALSgwKdnksuY3k5Addp5lg8sVoVcQ==}
+    requiresBuild: true
     dependencies:
       safe-buffer: 5.2.1
 
