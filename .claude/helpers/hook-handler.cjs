@@ -105,26 +105,20 @@ async function main() {
 
 const handlers = {
   'route': () => {
+    var result = { status: 'ok' };
     if (intelligence && intelligence.getContext) {
       try {
         const ctx = intelligence.getContext(prompt);
-        if (ctx) console.log(ctx);
+        if (ctx) result.context = ctx;
       } catch (e) { /* non-fatal */ }
     }
     if (router && router.routeTask) {
-      const result = router.routeTask(prompt);
-      var output = [];
-      output.push('[INFO] Routing task: ' + (prompt.substring(0, 80) || '(no prompt)'));
-      output.push('');
-      output.push('+------------------- Primary Recommendation -------------------+');
-      output.push('| Agent: ' + result.agent.padEnd(53) + '|');
-      output.push('| Confidence: ' + (result.confidence * 100).toFixed(1) + '%' + ' '.repeat(44) + '|');
-      output.push('| Reason: ' + result.reason.substring(0, 53).padEnd(53) + '|');
-      output.push('+--------------------------------------------------------------+');
-      console.log(output.join('\n'));
-    } else {
-      console.log('[INFO] Router not available, using default routing');
+      const routeResult = router.routeTask(prompt);
+      result.agent = routeResult.agent;
+      result.confidence = routeResult.confidence;
+      result.reason = routeResult.reason;
     }
+    console.log(JSON.stringify(result));
   },
 
   'pre-bash': () => {
@@ -132,11 +126,11 @@ const handlers = {
     var dangerous = ['rm -rf /', 'format c:', 'del /s /q c:\\', ':(){:|:&};:'];
     for (var i = 0; i < dangerous.length; i++) {
       if (cmd.includes(dangerous[i])) {
-        console.error('[BLOCKED] Dangerous command detected: ' + dangerous[i]);
+        console.error(JSON.stringify({ status: 'blocked', reason: 'Dangerous command detected: ' + dangerous[i] }));
         process.exit(1);
       }
     }
-    console.log('[OK] Command validated');
+    console.log(JSON.stringify({ status: 'ok', message: 'Command validated' }));
   },
 
   'post-edit': () => {
@@ -150,55 +144,58 @@ const handlers = {
         intelligence.recordEdit(file);
       } catch (e) { /* non-fatal */ }
     }
-    console.log('[OK] Edit recorded');
+    console.log(JSON.stringify({ status: 'ok', message: 'Edit recorded' }));
   },
 
   'session-restore': async () => {
+    var result = { status: 'ok' };
     if (session) {
       var existing = session.restore && session.restore();
       if (!existing) {
         session.start && session.start();
       }
-    } else {
-      console.log('[OK] Session restored: session-' + Date.now());
+      result.sessionId = 'session-' + Date.now();
     }
     // Initialize intelligence (with timeout — #1530)
     if (intelligence && intelligence.init) {
       var initResult = await runWithTimeout(function() { return intelligence.init(); }, 'intelligence.init()');
       if (initResult && initResult.nodes > 0) {
-        console.log('[INTELLIGENCE] Loaded ' + initResult.nodes + ' patterns, ' + initResult.edges + ' edges');
+        result.intelligence = { nodes: initResult.nodes, edges: initResult.edges };
       }
     }
+    console.log(JSON.stringify(result));
   },
 
   'session-end': async () => {
+    var result = { status: 'ok' };
     // Consolidate intelligence (with timeout — #1530)
     if (intelligence && intelligence.consolidate) {
       var consResult = await runWithTimeout(function() { return intelligence.consolidate(); }, 'intelligence.consolidate()');
       if (consResult && consResult.entries > 0) {
-        var msg = '[INTELLIGENCE] Consolidated: ' + consResult.entries + ' entries, ' + consResult.edges + ' edges';
-        if (consResult.newEntries > 0) msg += ', ' + consResult.newEntries + ' new';
-        msg += ', PageRank recomputed';
-        console.log(msg);
+        result.consolidated = {
+          entries: consResult.entries,
+          edges: consResult.edges,
+          newEntries: consResult.newEntries || 0
+        };
       }
     }
     if (session && session.end) {
       session.end();
-    } else {
-      console.log('[OK] Session ended');
     }
+    console.log(JSON.stringify(result));
   },
 
   'pre-task': () => {
+    var result = { status: 'ok', message: 'Task started' };
     if (session && session.metric) {
       try { session.metric('tasks'); } catch (e) { /* no active session */ }
     }
     if (router && router.routeTask && prompt) {
-      var result = router.routeTask(prompt);
-      console.log('[INFO] Task routed to: ' + result.agent + ' (confidence: ' + result.confidence + ')');
-    } else {
-      console.log('[OK] Task started');
+      var routeResult = router.routeTask(prompt);
+      result.agent = routeResult.agent;
+      result.confidence = routeResult.confidence;
     }
+    console.log(JSON.stringify(result));
   },
 
   'post-task': () => {
@@ -207,37 +204,43 @@ const handlers = {
         intelligence.feedback(true);
       } catch (e) { /* non-fatal */ }
     }
-    console.log('[OK] Task completed');
+    console.log(JSON.stringify({ status: 'ok', message: 'Task completed' }));
   },
 
   'compact-manual': () => {
-    console.log('PreCompact Guidance:');
-    console.log('IMPORTANT: Review CLAUDE.md in project root for:');
-    console.log('   - Available agents and concurrent usage patterns');
-    console.log('   - Swarm coordination strategies (hierarchical, mesh, adaptive)');
-    console.log('   - Critical concurrent execution rules (1 MESSAGE = ALL OPERATIONS)');
-    console.log('Ready for compact operation');
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: 'PreCompact Guidance',
+      guidance: [
+        'Review CLAUDE.md for available agents and concurrent usage patterns',
+        'Swarm coordination strategies (hierarchical, mesh, adaptive)',
+        'Critical concurrent execution rules (1 MESSAGE = ALL OPERATIONS)'
+      ]
+    }));
   },
 
   'compact-auto': () => {
-    console.log('Auto-Compact Guidance (Context Window Full):');
-    console.log('CRITICAL: Before compacting, ensure you understand:');
-    console.log('   - All agents available in .claude/agents/ directory');
-    console.log('   - Concurrent execution patterns from CLAUDE.md');
-    console.log('   - Swarm coordination strategies for complex tasks');
-    console.log('Apply GOLDEN RULE: Always batch operations in single messages');
-    console.log('Auto-compact proceeding with full agent context');
+    console.log(JSON.stringify({
+      status: 'ok',
+      message: 'Auto-Compact Guidance (Context Window Full)',
+      guidance: [
+        'All agents available in .claude/agents/ directory',
+        'Concurrent execution patterns from CLAUDE.md',
+        'Swarm coordination strategies for complex tasks',
+        'Apply GOLDEN RULE: Always batch operations in single messages'
+      ]
+    }));
   },
 
   'status': () => {
-    console.log('[OK] Status check');
+    console.log(JSON.stringify({ status: 'ok', message: 'Status check' }));
   },
 
   'stats': () => {
     if (intelligence && intelligence.stats) {
-      intelligence.stats(args.includes('--json'));
+      intelligence.stats(true);  // Always JSON output
     } else {
-      console.log('[WARN] Intelligence module not available. Run session-restore first.');
+      console.log(JSON.stringify({ status: 'warn', message: 'Intelligence module not available. Run session-restore first.' }));
     }
   },
 };
@@ -246,17 +249,17 @@ if (command && handlers[command]) {
     try {
       await Promise.resolve(handlers[command]());
     } catch (e) {
-      console.log('[WARN] Hook ' + command + ' encountered an error: ' + e.message);
+      console.log(JSON.stringify({ status: 'warn', message: 'Hook ' + command + ' encountered an error: ' + e.message }));
     }
   } else if (command) {
-    console.log('[OK] Hook: ' + command);
+    console.log(JSON.stringify({ status: 'ok', message: 'Hook: ' + command }));
   } else {
-    console.log('Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>');
+    console.log(JSON.stringify({ status: 'error', message: 'Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>' }));
   }
 }
 
 main().catch(function(e) {
-  console.log('[WARN] Hook handler error: ' + e.message);
+  console.log(JSON.stringify({ status: 'error', message: 'Hook handler error: ' + e.message }));
 }).finally(function() {
   // Ensure clean exit for Claude Code hooks
   process.exit(0);
