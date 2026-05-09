@@ -75,12 +75,12 @@ jobs:
           if [ "$SCOPE" = "smoke" ]; then
             AGENT_MATRIX='{"include":[{"type":"coder","count":2},{"type":"tester","count":1}]}'
           elif [ "$SCOPE" = "core" ]; then
-            AGENT_MATRIX='{"include":[{"type":"coder","count":3},{"type":"tester","count":2},{"type":"reviewer","count":1},{"type":"planner","count":1}]}'
+            AGENT_MATRIX='{"include":[{"type":"coder","count":3},{"type":"tester","count":2},{"type":"reviewer","count":1},{"type":"coordinator","count":1}]}'
           elif [ "$SCOPE" = "stress" ]; then
-            AGENT_MATRIX='{"include":[{"type":"coder","count":5},{"type":"tester","count":3},{"type":"reviewer","count":2},{"type":"planner","count":2},{"type":"researcher","count":1}]}'
+            AGENT_MATRIX='{"include":[{"type":"coder","count":5},{"type":"tester","count":3},{"type":"reviewer","count":2},{"type":"coordinator","count":2},{"type":"researcher","count":1}]}'
           else
             # Full scope
-            AGENT_MATRIX='{"include":[{"type":"coder","count":4},{"type":"tester","count":3},{"type":"reviewer","count":2},{"type":"planner","count":2},{"type":"researcher","count":1},{"type":"backend-dev","count":1},{"type":"performance-benchmarker","count":1}]}'
+            AGENT_MATRIX='{"include":[{"type":"coder","count":4},{"type":"tester","count":3},{"type":"reviewer","count":2},{"type":"coordinator","count":2},{"type":"researcher","count":1},{"type":"architect","count":1},{"type":"performance-engineer","count":1}]}'
           fi
           
           echo "agent-matrix=$AGENT_MATRIX" >> $GITHUB_OUTPUT
@@ -383,7 +383,7 @@ jobs:
             };
             
             // Simulate multiple agents accessing shared memory
-            const agents = ['coder-1', 'tester-1', 'reviewer-1', 'planner-1'];
+            const agents = ['coder-1', 'tester-1', 'reviewer-1', 'coordinator-1'];
             
             for (let i = 0; i < 5; i++) {
               const syncTest = {

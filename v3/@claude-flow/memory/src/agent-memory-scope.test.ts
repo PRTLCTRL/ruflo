@@ -139,9 +139,9 @@ describe('resolveAgentMemoryDir', () => {
   it('should resolve user scope to ~/.claude/agent-memory/name/', () => {
     process.env.HOME = '/home/testuser';
 
-    const result = resolveAgentMemoryDir('planner', 'user');
+    const result = resolveAgentMemoryDir('coordinator', 'user');
     expect(result).toBe(
-      path.join('/home/testuser', '.claude', 'agent-memory', 'planner'),
+      path.join('/home/testuser', '.claude', 'agent-memory', 'coordinator'),
     );
   });
 
@@ -546,7 +546,7 @@ describe('listAgentScopes', () => {
       const s = String(p);
       if (s === projectDir) return ['coder', 'tester'];
       if (s === localDir) return ['researcher'];
-      if (s === userDir) return ['planner'];
+      if (s === userDir) return ['coordinator'];
       return [];
     });
 
@@ -556,7 +556,7 @@ describe('listAgentScopes', () => {
 
     expect(scopes[0]).toEqual({ scope: 'project', agents: ['coder', 'tester'] });
     expect(scopes[1]).toEqual({ scope: 'local', agents: ['researcher'] });
-    expect(scopes[2]).toEqual({ scope: 'user', agents: ['planner'] });
+    expect(scopes[2]).toEqual({ scope: 'user', agents: ['coordinator'] });
   });
 
   it('should return all three scopes in order: project, local, user', () => {

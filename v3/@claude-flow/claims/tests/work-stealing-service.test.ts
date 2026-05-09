@@ -15,7 +15,7 @@ import { createMock, type MockedInterface } from '../../testing/src/helpers/crea
 
 type ClaimantType = 'agent' | 'human';
 type ClaimStatus = 'active' | 'pending_handoff' | 'expired' | 'released';
-type AgentType = 'coder' | 'reviewer' | 'tester' | 'planner' | 'researcher' | 'queen-coordinator';
+type AgentType = 'coder' | 'reviewer' | 'tester' | 'coordinator' | 'researcher' | 'queen-coordinator';
 
 interface Claimant {
   type: ClaimantType;
@@ -129,19 +129,19 @@ interface CrossTypeStealingRules {
 
 const DEFAULT_STEALING_RULES: CrossTypeStealingRules = {
   allowedSteals: new Map([
-    ['coder', ['coder', 'planner']], // Coders can steal from coders and planners
+    ['coder', ['coder', 'coordinator']], // Coders can steal from coders and coordinators
     ['reviewer', ['coder', 'reviewer']], // Reviewers can steal from coders and reviewers
     ['tester', ['tester', 'coder']], // Testers can steal from testers and coders
-    ['planner', ['planner', 'researcher']], // Planners can steal from planners and researchers
+    ['coordinator', ['coordinator', 'researcher']], // Coordinators can steal from coordinators and researchers
     ['researcher', ['researcher']], // Researchers can only steal from researchers
-    ['queen-coordinator', ['coder', 'reviewer', 'tester', 'planner', 'researcher']], // Queen can steal from anyone
+    ['queen-coordinator', ['coder', 'reviewer', 'tester', 'coordinator', 'researcher']], // Queen can steal from anyone
   ]),
   priorityLevels: new Map([
     ['queen-coordinator', 100],
     ['reviewer', 80],
     ['tester', 70],
     ['coder', 60],
-    ['planner', 50],
+    ['coordinator', 50],
     ['researcher', 40],
   ]),
   humanClaimsProtected: true,

@@ -13,7 +13,7 @@ import { createMock, type MockedInterface } from '../../testing/src/helpers/crea
 // Domain Types
 // =============================================================================
 
-type AgentType = 'coder' | 'reviewer' | 'tester' | 'planner' | 'researcher' | 'queen-coordinator';
+type AgentType = 'coder' | 'reviewer' | 'tester' | 'coordinator' | 'researcher' | 'queen-coordinator';
 type AgentStatus = 'idle' | 'busy' | 'overloaded' | 'offline';
 
 interface AgentLoad {

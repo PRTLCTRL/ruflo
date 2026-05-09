@@ -733,9 +733,9 @@ npx claude-flow security scan --depth full
 
 ## Available Agents
 
-Core Development: coder, reviewer, tester, planner, researcher
+Core Development: coder, reviewer, tester, coordinator, researcher
 Swarm Coordination: hierarchical-coordinator, mesh-coordinator
-Performance: perf-analyzer, performance-benchmarker
+Performance: perf-analyzer, performance-engineer
 
 ## Hooks System
 

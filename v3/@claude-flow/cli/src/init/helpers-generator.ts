@@ -211,10 +211,8 @@ const AGENT_CAPABILITIES = {
   tester: ['unit-testing', 'integration-testing', 'coverage', 'test-generation'],
   reviewer: ['code-review', 'security-audit', 'quality-check', 'best-practices'],
   researcher: ['web-search', 'documentation', 'analysis', 'summarization'],
-  architect: ['system-design', 'architecture', 'patterns', 'scalability'],
-  'backend-dev': ['api', 'database', 'server', 'authentication'],
-  'frontend-dev': ['ui', 'react', 'css', 'components'],
-  devops: ['ci-cd', 'docker', 'deployment', 'infrastructure'],
+  architect: ['system-design', 'architecture', 'patterns', 'scalability', 'api', 'database'],
+  coordinator: ['workflow', 'orchestration', 'planning', 'task-management'],
 };
 
 const TASK_PATTERNS = {
@@ -226,9 +224,8 @@ const TASK_PATTERNS = {
   'design|architect|structure|plan': 'architect',
 
   // Domain patterns
-  'api|endpoint|server|backend|database': 'backend-dev',
-  'ui|frontend|component|react|css|style': 'frontend-dev',
-  'deploy|docker|ci|cd|pipeline|infrastructure': 'devops',
+  'api|endpoint|server|backend|database': 'architect',
+  'coordinate|orchestrate|manage|workflow': 'coordinator',
 };
 
 function routeTask(task) {

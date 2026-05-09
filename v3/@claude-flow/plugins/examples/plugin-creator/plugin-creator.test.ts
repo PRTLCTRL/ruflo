@@ -206,7 +206,7 @@ describe('Plugin Creator Plugin', () => {
 
   describe('generateWorkerCode', () => {
     it('should generate valid worker definitions for known types', () => {
-      const types = ['coder', 'reviewer', 'tester', 'researcher', 'planner', 'coordinator', 'security', 'performance'];
+      const types = ['coder', 'reviewer', 'tester', 'researcher', 'coordinator', 'security', 'performance'];
 
       for (const type of types) {
         const { definition, code } = generateWorkerCode(type);

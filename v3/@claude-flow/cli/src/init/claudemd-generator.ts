@@ -151,10 +151,10 @@ npx @claude-flow/cli@latest hooks worker dispatch --trigger audit
 function agentTypes(): string {
   return `## Agents
 
-**Core**: \`coder\`, \`reviewer\`, \`tester\`, \`planner\`, \`researcher\`
-**Architecture**: \`system-architect\`, \`backend-dev\`, \`mobile-dev\`
+**Core**: \`coder\`, \`reviewer\`, \`tester\`, \`coordinator\`, \`researcher\`
+**Architecture**: \`system-architect\`, \`architect\`, \`core-architect\`
 **Security**: \`security-architect\`, \`security-auditor\`
-**Performance**: \`performance-engineer\`, \`perf-analyzer\`
+**Performance**: \`performance-engineer\`, \`optimizer\`, \`analyst\`
 **Coordination**: \`hierarchical-coordinator\`, \`mesh-coordinator\`, \`adaptive-coordinator\`
 **GitHub**: \`pr-manager\`, \`code-review-swarm\`, \`issue-tracker\`, \`release-manager\`
 

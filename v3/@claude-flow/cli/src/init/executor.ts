@@ -1485,7 +1485,7 @@ npx @claude-flow/cli@latest swarm monitor
 \`byzantine-coordinator\`, \`raft-manager\`, \`gossip-coordinator\`, \`consensus-builder\`, \`crdt-synchronizer\`, \`quorum-manager\`, \`security-manager\`
 
 ### Performance & Optimization (5)
-\`perf-analyzer\`, \`performance-benchmarker\`, \`task-orchestrator\`, \`memory-coordinator\`, \`smart-agent\`
+\`optimizer\`, \`analyst\`, \`performance-engineer\`, \`task-orchestrator\`, \`memory-coordinator\`, \`smart-agent\`
 
 ### GitHub & Repository (9)
 \`github-modes\`, \`pr-manager\`, \`code-review-swarm\`, \`issue-tracker\`, \`release-manager\`, \`workflow-automation\`, \`project-board-sync\`, \`repo-architect\`, \`multi-repo-swarm\`
@@ -1493,8 +1493,8 @@ npx @claude-flow/cli@latest swarm monitor
 ### SPARC Methodology (6)
 \`sparc-coord\`, \`sparc-coder\`, \`specification\`, \`pseudocode\`, \`architecture\`, \`refinement\`
 
-### Specialized Development (8)
-\`backend-dev\`, \`mobile-dev\`, \`ml-developer\`, \`cicd-engineer\`, \`api-docs\`, \`system-architect\`, \`code-analyzer\`, \`base-template-generator\`
+### Specialized Development (6)
+\`system-architect\`, \`architect\`, \`core-architect\`, \`code-analyzer\`, \`base-template-generator\`, \`test-architect\`
 
 ### Testing & Validation (2)
 \`tdd-london-swarm\`, \`production-validator\`
