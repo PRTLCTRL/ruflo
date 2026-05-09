@@ -132,10 +132,11 @@ const handlers = {
     var dangerous = ['rm -rf /', 'format c:', 'del /s /q c:\\', ':(){:|:&};:'];
     for (var i = 0; i < dangerous.length; i++) {
       if (cmd.includes(dangerous[i])) {
+        console.log(JSON.stringify({ status: 'blocked', message: 'Dangerous command detected: ' + dangerous[i] }));
         process.exit(1);
       }
     }
-    // No output - hook succeeded silently
+    console.log(JSON.stringify({ status: 'ok', message: 'Command validated' }));
   },
 
   'post-edit': () => {
@@ -149,7 +150,7 @@ const handlers = {
         intelligence.recordEdit(file);
       } catch (e) { /* non-fatal */ }
     }
-    console.log('[OK] Edit recorded');
+    console.log(JSON.stringify({ status: 'ok', message: 'Edit recorded' }));
   },
 
   'session-restore': async () => {
@@ -244,19 +245,18 @@ const handlers = {
 if (command && handlers[command]) {
     try {
       await Promise.resolve(handlers[command]());
-      console.log('{"status":"ok"}');
     } catch (e) {
-      console.log('{"status":"error","message":"' + e.message.replace(/"/g, '\\"') + '"}');
+      console.log(JSON.stringify({ status: 'warn', message: 'Hook ' + command + ' encountered an error: ' + e.message }));
     }
   } else if (command) {
-    console.log('{"status":"ok","message":"Hook: ' + command + '"}');
+    console.log(JSON.stringify({ status: 'ok', message: 'Hook: ' + command }));
   } else {
-    console.log('{"status":"error","message":"No command specified"}');
+    console.log(JSON.stringify({ status: 'ok', message: 'Usage: hook-handler.cjs <route|pre-bash|post-edit|session-restore|session-end|pre-task|post-task|compact-manual|compact-auto|status|stats>' }));
   }
 }
 
 main().catch(function(e) {
-  console.log('{"status":"error","message":"' + e.message.replace(/"/g, '\\"') + '"}');
+  console.log('[WARN] Hook handler error: ' + e.message);
 }).finally(function() {
   // Ensure clean exit for Claude Code hooks
   process.exit(0);

@@ -60,7 +60,8 @@
     ],
     "overrides": {
       "@ruvector/gnn": "0.1.25",
-      "@ruvector/gnn-linux-x64-gnu": "0.1.25"
+      "@ruvector/gnn-linux-x64-gnu": "0.1.25",
+      "tar": ">=6.2.1"
     }
   }
 }
