@@ -1,6 +1,40 @@
 import type { OpenAiTool } from "$lib/server/mcp/tools";
 
-export function buildToolPreprompt(tools: OpenAiTool[], autopilot?: boolean): string {
+/**
+ * Detects if the user is requesting plan-only output without execution.
+ * Checks for common plan-related keywords in the user's message.
+ */
+function isPlanOnlyRequest(userMessage?: string): boolean {
+	if (!userMessage) return false;
+	const lowerMessage = userMessage.toLowerCase();
+	const planKeywords = [
+		"generate a plan",
+		"generate the plan",
+		"create a plan",
+		"create the plan",
+		"show me a plan",
+		"give me a plan",
+		"make a plan",
+		"plan only",
+		"just a plan",
+		"just the plan",
+		"only a plan",
+		"only the plan",
+		"planning phase",
+		"plan out",
+		"outline a plan",
+		"outline the plan",
+		"draft a plan",
+		"draft the plan",
+	];
+	return planKeywords.some((keyword) => lowerMessage.includes(keyword));
+}
+
+export function buildToolPreprompt(
+	tools: OpenAiTool[],
+	autopilot?: boolean,
+	userMessage?: string
+): string {
 	if (!Array.isArray(tools) || tools.length === 0) return "";
 	const names = tools
 		.map((t) => (t?.function?.name ? String(t.function.name) : ""))
@@ -18,7 +52,9 @@ export function buildToolPreprompt(tools: OpenAiTool[], autopilot?: boolean): st
 		`Today's date: ${currentDate} (${isoDate}).`,
 	];
 
-	if (autopilot) {
+	const planOnly = isPlanOnlyRequest(userMessage);
+
+	if (autopilot && !planOnly) {
 		lines.push(
 			`AUTOPILOT MODE ENABLED — PARALLEL SWARM EXECUTION. Follow these rules STRICTLY:`,
 			`1. NEVER ask for confirmation. Make reasonable assumptions. Proceed immediately.`,
@@ -29,6 +65,15 @@ export function buildToolPreprompt(tools: OpenAiTool[], autopilot?: boolean): st
 			`6. Only provide a final text response when ALL work is done and you have nothing left to execute.`,
 			`7. NEVER explain what you plan to do. Just DO IT by calling tools.`,
 			`8. Maximize parallel execution: if you can call 3+ tools at once, DO IT. Sequential is only for dependencies.`,
+		);
+	} else if (planOnly) {
+		lines.push(
+			`PLAN-ONLY MODE DETECTED. The user is requesting ONLY a plan, NOT execution. Follow these rules:`,
+			`1. DO NOT call any tools or execute actions automatically.`,
+			`2. Provide a detailed, structured plan explaining what you WOULD do if asked to execute.`,
+			`3. Include: phases, tasks, architecture decisions, file structure, and implementation approach.`,
+			`4. After presenting the plan, WAIT for explicit user confirmation before proceeding with execution.`,
+			`5. Make it clear that this is a plan only and ask if the user wants to proceed with implementation.`,
 		);
 	} else {
 		lines.push(

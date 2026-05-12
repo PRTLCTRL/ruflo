@@ -348,7 +348,12 @@ export async function* runMcpFlow({
 			imageProcessor,
 			mmEnabled
 		);
-		const toolPreprompt = buildToolPreprompt(oaTools, autopilot);
+		const lastUserMessage =
+			messages
+				.slice()
+				.reverse()
+				.find((m) => m.from === "user")?.content ?? "";
+		const toolPreprompt = buildToolPreprompt(oaTools, autopilot, lastUserMessage);
 		const prepromptPieces: string[] = [];
 		if (toolPreprompt.trim().length > 0) {
 			prepromptPieces.push(toolPreprompt);
