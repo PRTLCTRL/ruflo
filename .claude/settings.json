@@ -156,10 +156,6 @@
       }
     ]
   },
-  "attribution": {
-    "commit": "Co-Authored-By: RuFlo <ruv@ruv.net>",
-    "pr": "\ud83e\udd16 Generated with [RuFlo](https://github.com/ruvnet/ruflo)"
-  },
   "claudeFlow": {
     "version": "3.6.11",
     "enabled": true,

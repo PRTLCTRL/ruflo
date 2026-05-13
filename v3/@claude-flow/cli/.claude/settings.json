@@ -114,10 +114,6 @@
       "Read(./.env.*)"
     ]
   },
-  "attribution": {
-    "commit": "Co-Authored-By: claude-flow <ruv@ruv.net>",
-    "pr": "Generated with [claude-flow](https://github.com/ruvnet/claude-flow)"
-  },
   "claudeFlow": {
     "version": "3.1.0",
     "enabled": true,

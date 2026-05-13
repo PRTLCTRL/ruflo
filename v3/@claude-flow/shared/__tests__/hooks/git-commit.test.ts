@@ -143,22 +143,38 @@ describe('GitCommitHook', () => {
   });
 
   describe('co-author addition', () => {
-    it('should add co-author by default', async () => {
+    it('should NOT add co-author by default (opt-in only)', async () => {
       const result = await gitCommit.process('Add feature');
+
+      expect(result.coAuthorAdded).toBe(false);
+      expect(result.modifiedMessage).not.toContain('Co-Authored-By:');
+    });
+
+    it('should NOT add Claude Code reference by default (opt-in only)', async () => {
+      const result = await gitCommit.process('Add feature');
+
+      expect(result.modifiedMessage).not.toContain('Claude Code');
+    });
+
+    it('should add co-author when explicitly enabled', async () => {
+      const hook = createGitCommitHook(registry, { addCoAuthor: true });
+      const result = await hook.process('Add feature');
 
       expect(result.coAuthorAdded).toBe(true);
       expect(result.modifiedMessage).toContain('Co-Authored-By:');
       expect(result.modifiedMessage).toContain('Claude');
     });
 
-    it('should add Claude Code reference', async () => {
-      const result = await gitCommit.process('Add feature');
+    it('should add Claude Code reference when explicitly enabled', async () => {
+      const hook = createGitCommitHook(registry, { addClaudeReference: true });
+      const result = await hook.process('Add feature');
 
       expect(result.modifiedMessage).toContain('Claude Code');
     });
 
     it('should not duplicate co-author if already present', async () => {
-      const result = await gitCommit.process('Add feature\n\nCo-Authored-By: Someone <some@email.com>');
+      const hook = createGitCommitHook(registry, { addCoAuthor: true });
+      const result = await hook.process('Add feature\n\nCo-Authored-By: Someone <some@email.com>');
 
       // Should still add Claude co-author
       expect(result.modifiedMessage).toContain('Claude');
@@ -213,7 +229,7 @@ describe('GitCommitHook', () => {
       expect(result.validationIssues!.some(i => i.type === 'length')).toBe(true);
     });
 
-    it('should allow disabling co-author', async () => {
+    it('should respect addCoAuthor: false (default)', async () => {
       const hook = createGitCommitHook(registry, { addCoAuthor: false });
       const result = await hook.process('Add feature');
 
@@ -221,15 +237,16 @@ describe('GitCommitHook', () => {
       expect(result.modifiedMessage).not.toContain('Co-Authored-By');
     });
 
-    it('should allow disabling Claude reference', async () => {
+    it('should respect addClaudeReference: false (default)', async () => {
       const hook = createGitCommitHook(registry, { addClaudeReference: false });
       const result = await hook.process('Add feature');
 
       expect(result.modifiedMessage).not.toContain('Claude Code');
     });
 
-    it('should allow custom co-author', async () => {
+    it('should allow custom co-author when enabled', async () => {
       const hook = createGitCommitHook(registry, {
+        addCoAuthor: true,
         coAuthor: { name: 'Custom AI', email: 'ai@example.com' },
       });
       const result = await hook.process('Add feature');
@@ -300,8 +317,9 @@ describe('GitCommitHook', () => {
   });
 
   describe('full message processing', () => {
-    it('should process complete message with all modifications', async () => {
-      const result = await gitCommit.process(
+    it('should process complete message with all modifications when enabled', async () => {
+      const hook = createGitCommitHook(registry, { addCoAuthor: true, addClaudeReference: true });
+      const result = await hook.process(
         'Implement user authentication',
         'feature/AUTH-123-login'
       );
