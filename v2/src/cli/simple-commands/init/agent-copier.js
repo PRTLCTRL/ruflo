@@ -102,7 +102,7 @@ export async function copyAgentFiles(targetDir, options = {}) {
     
     if (!dryRun && copiedFiles.length > 0) {
       console.log(`  ✅ Copied ${copiedFiles.length} agent files`);
-      console.log('  📋 Agent system initialized with 64 specialized agents');
+      console.log('  📋 Core agent system initialized — functional agents only');
       console.log('  🎯 Available categories: Core, Swarm, Consensus, Performance, GitHub, SPARC, Testing');
     } else if (dryRun) {
       console.log(`  [DRY RUN] Would copy ${copiedFiles.length} agent files`);
@@ -150,22 +150,13 @@ export async function createAgentDirectories(targetDir, dryRun = false) {
     '.claude/agents/testing/validation',
     '.claude/agents/templates',
     '.claude/agents/analysis',
-    '.claude/agents/analysis/code-review',
     '.claude/agents/architecture',
-    '.claude/agents/architecture/system-design',
     '.claude/agents/data',
-    '.claude/agents/data/ml',
     '.claude/agents/development',
-    '.claude/agents/development/backend',
     '.claude/agents/devops',
-    '.claude/agents/devops/ci-cd',
     '.claude/agents/documentation',
-    '.claude/agents/documentation/api-docs',
     '.claude/agents/specialized',
-    '.claude/agents/specialized/mobile',
-    '.claude/agents/flow-nexus',
-    '.claude/commands',
-    '.claude/commands/flow-nexus'
+    '.claude/commands'
   ];
   
   if (dryRun) {
@@ -280,7 +271,7 @@ export async function copyCommandFiles(targetDir, options = {}) {
     if (!dryRun && copiedFiles.length > 0) {
       console.log(`  ✅ Copied ${copiedFiles.length} command files`);
       console.log('  📋 Command system initialized with comprehensive documentation');
-      console.log('  🎯 Available categories: Analysis, Automation, GitHub, Hooks, Memory, Flow Nexus');
+      console.log('  🎯 Available categories: Analysis, Automation, GitHub, Hooks, Memory');
     } else if (dryRun) {
       console.log(`  [DRY RUN] Would copy ${copiedFiles.length} command files`);
     }
@@ -329,7 +320,7 @@ export async function validateAgentSystem(targetDir) {
     console.log(`    • Categories: ${agentCategories.join(', ')}`);
     
     return {
-      valid: totalAgents > 50, // Should have at least 50+ agents
+      valid: totalAgents > 40, // Should have at least 40+ functional agents
       categories: agentCategories.length,
       totalAgents,
       categoryNames: agentCategories
