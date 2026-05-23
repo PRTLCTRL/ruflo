@@ -3131,6 +3131,24 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // Abort early if executor cannot isolate configs (option 1 from issue #1652)
+  if (!contentAware) {
+    throw new Error(
+      'ab-test requires a content-aware executor to isolate Config A from Config B.\n' +
+      '\n' +
+      'The provided executor does not implement IContentAwareExecutor (no setContext method),\n' +
+      'so both configs will read the same on-disk CLAUDE.md, producing a guaranteed zero delta.\n' +
+      '\n' +
+      'This would waste ~20 tasks × 2 configs × ~$0.58/call ≈ $23 and ~21 minutes to produce\n' +
+      'a meaningless result.\n' +
+      '\n' +
+      'Solution: Provide an executor that implements IContentAwareExecutor with a setContext()\n' +
+      'method, or use the DefaultHeadlessExecutor which does support context-aware execution.\n' +
+      '\n' +
+      'For more information, see https://github.com/ruvnet/ruflo/issues/1652'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');
