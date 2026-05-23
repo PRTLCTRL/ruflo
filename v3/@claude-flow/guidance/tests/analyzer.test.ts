@@ -2075,6 +2075,52 @@ class ABDifferentialExecutor implements IContentAwareExecutor {
 }
 
 describe('abBenchmark', () => {
+  describe('executor validation', () => {
+    it('throws clear error when executor is not content-aware', async () => {
+      // Static executor that doesn't implement IContentAwareExecutor
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/requires a content-aware executor/);
+    });
+
+    it('provides helpful error message with fix suggestions', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        });
+        expect.fail('Should have thrown an error');
+      } catch (error: unknown) {
+        const err = error as Error;
+        expect(err.message).toContain('IContentAwareExecutor');
+        expect(err.message).toContain('setContext');
+        expect(err.message).toContain('DefaultHeadlessExecutor');
+        expect(err.message).toContain('zero-delta');
+      }
+    });
+
+    it('does not throw when executor is content-aware', async () => {
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new ABDifferentialExecutor(),
+        })
+      ).resolves.toBeDefined();
+    });
+  });
+
   describe('task inventory', () => {
     it('provides 20 default tasks', () => {
       const tasks = getDefaultABTasks();
