@@ -605,9 +605,42 @@ interface HeadlessBenchmarkTask {
   expectPresent: string[];
 }
 
+/**
+ * Default headless executor that implements the content-aware interface for A/B testing.
+ *
+ * This executor solves the zero-delta bug (issue #1652) by allowing each config to
+ * run with different CLAUDE.md content:
+ *
+ * - **Config A**: setContext('') → removes CLAUDE.md temporarily → no guidance
+ * - **Config B**: setContext(claudeMdContent) → swaps in provided content → with guidance
+ *
+ * The executor physically swaps the CLAUDE.md file in the work directory before
+ * executing `claude -p`, then restores the original after completion. This ensures
+ * each config truly experiences different behavioral contexts.
+ *
+ * ## Fix for Issue #1652
+ *
+ * Before this implementation, both configs would read the same on-disk CLAUDE.md,
+ * producing a guaranteed zero-delta result regardless of the guidance content.
+ * Users would spend ~$23 and 21 minutes per benchmark to learn nothing.
+ *
+ * Now:
+ * 1. Config A removes CLAUDE.md (empty string) → baseline behavior
+ * 2. Config B installs provided CLAUDE.md → guided behavior
+ * 3. Delta reflects the actual impact of your guidance rules
+ *
+ * @see https://github.com/ruvnet/ruflo/issues/1652
+ */
 class DefaultHeadlessExecutor implements IContentAwareExecutor {
   private contextContent: string | null = null;
 
+  /**
+   * Set the CLAUDE.md content that the next execute() call should use.
+   *
+   * - Pass an empty string ('') to simulate no guidance (Config A)
+   * - Pass full CLAUDE.md content to enable guidance (Config B)
+   * - Pass null to use whatever CLAUDE.md exists in workDir (no swap)
+   */
   setContext(claudeMdContent: string): void {
     this.contextContent = claudeMdContent;
   }

@@ -7,6 +7,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0-alpha.3] - 2026-05-23
+
+### 🐛 Bug Fixes
+
+#### @claude-flow/guidance
+
+**Fixed: A/B benchmark zero-delta bug (#1652)**
+
+The `ruflo guidance ab-test` command was producing guaranteed zero-delta results, wasting ~$23 and 21 minutes per benchmark run. Both Config A (no guidance) and Config B (with guidance) were reading the same on-disk CLAUDE.md, making it architecturally impossible to measure the impact of guidance rules.
+
+**Root cause**: The issue description referenced an older published version where `DefaultHeadlessExecutor` didn't implement the content-aware interface. While the fix was already present in the source code, it needed proper documentation and version bump for publication.
+
+**What's fixed**:
+- `DefaultHeadlessExecutor` now clearly implements `IContentAwareExecutor` with comprehensive documentation
+- `setContext()` method allows each config to run with different CLAUDE.md content:
+  - **Config A**: `setContext('')` → removes CLAUDE.md temporarily → baseline behavior
+  - **Config B**: `setContext(claudeMdContent)` → swaps in provided content → guided behavior
+- Physical file swapping ensures each config truly experiences different behavioral contexts
+- Original CLAUDE.md is backed up and restored after each execution
+- Version bumped to alpha.3 to trigger new npm publication
+
+**Impact**: Users can now get meaningful A/B benchmark results that accurately measure how well their CLAUDE.md guidance rules improve agent behavior across the 20-task suite (bug-fix, feature, refactor, security, deployment, test, performance).
+
+**See**: [Issue #1652](https://github.com/ruvnet/ruflo/issues/1652)
+
+---
+
 ## [3.0.0-alpha.1] - 2026-01-04
 
 ### 🚀 Major Changes
