@@ -3131,9 +3131,29 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // ── Validate executor capability ────────────────────────────────────
+  // A/B benchmark requires a content-aware executor to isolate Config A
+  // (no guidance) from Config B (with guidance). Without this capability,
+  // both configs read the same on-disk CLAUDE.md, producing zero delta.
+  if (!contentAware) {
+    throw new Error(
+      'abBenchmark requires a content-aware executor (one that implements ' +
+      'IContentAwareExecutor with setContext method). The provided executor cannot ' +
+      'swap CLAUDE.md content between Config A and Config B, which means both ' +
+      'configs will read the same on-disk file and produce a guaranteed zero-delta ' +
+      'result. To fix this:\n' +
+      '  1. Use DefaultHeadlessExecutor() (default)\n' +
+      '  2. Implement IContentAwareExecutor in your custom executor\n' +
+      '  3. Ensure your executor has a setContext(content: string) method'
+    );
+  }
+
+  // Type assertion is safe here because we've validated contentAware === true
+  const contentAwareExecutor = executor as IContentAwareExecutor;
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
-  if (contentAware) executor.setContext('');
+  contentAwareExecutor.setContext('');
   const configAResults = await runABConfig(executor, tasks, workDir);
   const configAMetrics = computeABMetrics(configAResults);
 
@@ -3142,7 +3162,7 @@ export async function abBenchmark(
   // Retriever injection: the executor gets full guidance context
   // Persisted ledger: gate simulation logs violations
   // Deterministic tool gateway: assertions enforce compliance
-  if (contentAware) executor.setContext(claudeMdContent);
+  contentAwareExecutor.setContext(claudeMdContent);
   const configBResults = await runABConfig(executor, tasks, workDir);
   const configBMetrics = computeABMetrics(configBResults);
 
