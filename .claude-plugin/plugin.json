@@ -1,7 +1,7 @@
 {
   "name": "claude-flow",
   "version": "2.5.0",
-  "description": "Enterprise AI agent orchestration plugin with 150+ commands, 74+ specialized agents, SPARC methodology, swarm coordination, GitHub integration, and neural training capabilities",
+  "description": "Enterprise AI agent orchestration plugin with 150+ commands, 89 specialized agents, SPARC methodology, swarm coordination, GitHub integration, and neural training capabilities",
   "author": {
     "name": "rUv",
     "email": "ruv@ruv.net"

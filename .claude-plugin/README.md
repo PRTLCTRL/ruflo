@@ -4,7 +4,7 @@
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Claude Code](https://img.shields.io/badge/Claude%20Code-%3E%3D2.0.0-purple.svg)](https://claude.com/code)
 
-> **Enterprise-grade AI agent orchestration plugin with 150+ commands, 74+ specialized agents, SPARC methodology, swarm coordination, GitHub integration, and neural training capabilities**
+> **Enterprise-grade AI agent orchestration plugin with 150+ commands, 89 specialized agents, SPARC methodology, swarm coordination, GitHub integration, and neural training capabilities**
 
 ---
 
@@ -27,7 +27,7 @@
 
 Claude Flow is the most comprehensive Claude Code plugin for enterprise AI agent orchestration. It provides a complete ecosystem for:
 
-- **Multi-Agent Coordination**: 74+ specialized agents with swarm intelligence
+- **Multi-Agent Coordination**: 89 specialized agents with swarm intelligence
 - **SPARC Methodology**: Systematic development with 18 specialized modes
 - **GitHub Automation**: 14+ tools for complete repository workflow automation
 - **Neural Training**: 27+ models with WASM acceleration
@@ -68,7 +68,7 @@ Claude Flow is the most comprehensive Claude Code plugin for enterprise AI agent
 - **Pattern Learning**: Self-improving agent behaviors
 - **Context Persistence**: Cross-session learning retention
 
-### 🎨 **74+ Specialized Agents**
+### 🎨 **89 Specialized Agents**
 
 #### Core Development (5)
 - `coder` - Code implementation specialist
@@ -262,13 +262,8 @@ Claude Flow is the most comprehensive Claude Code plugin for enterprise AI agent
 
 #### Flow Nexus (9)
 - `/flow-nexus-swarm` - Cloud swarm orchestration
-- `/flow-nexus-workflow` - Event-driven workflows
-- `/flow-nexus-neural-network` - Distributed neural training
-- `/flow-nexus-sandbox` - E2B sandbox management
-- `/flow-nexus-app-store` - Application marketplace
-- `/flow-nexus-challenges` - Coding challenges
-- `/flow-nexus-payments` - Credit management
-- `/flow-nexus-user-tools` - User management
+- `/flow-nexus-workflow` - Event-driven workflows (requires optional flow-nexus MCP server)
+- `/flow-nexus-user-tools` - User management (requires optional flow-nexus MCP server)
 - `/flow-nexus-login` - Authentication
 
 #### And 50+ more commands!
