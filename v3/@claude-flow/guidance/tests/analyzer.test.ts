@@ -2465,4 +2465,77 @@ describe('abBenchmark', () => {
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
   });
+
+  describe('executor safety checks', () => {
+    it('throws error when non-content-aware executor is provided', async () => {
+      // Create a mock executor that does NOT implement setContext
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'fake output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/requires a content-aware executor/);
+    });
+
+    it('error message explains why content-aware executor is needed', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'fake output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/cannot isolate Config A from Config B/);
+    });
+
+    it('error message mentions IContentAwareExecutor interface', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'fake output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/IContentAwareExecutor/);
+    });
+
+    it('default executor passes content-aware check', async () => {
+      // This test verifies that DefaultHeadlessExecutor (the default) is content-aware
+      // and doesn't trigger the safety check error.
+      // We use a minimal custom task and expect it to fail for other reasons
+      // (missing claude CLI, directory issues), but NOT our safety check.
+      const minimalTask: ABTask[] = [{
+        id: 'test-task',
+        description: 'Test task',
+        taskClass: 'bug-fix',
+        prompt: 'Fix the bug',
+        assertions: [{ type: 'must-contain', value: 'fix', severity: 'critical' }],
+        gatePatterns: [{ category: 'secrets', pattern: 'secret', severity: 'critical' }],
+      }];
+
+      // If DefaultHeadlessExecutor is not content-aware, this will throw our safety error
+      // Since we're not providing an executor, it uses the default
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          tasks: minimalTask,
+          workDir: '/tmp/nonexistent-test-dir-for-ab-test',
+        });
+      } catch (error: any) {
+        // Expect it to fail due to missing claude CLI or directory issues,
+        // but NOT due to our "requires a content-aware executor" safety check
+        expect(error.message).not.toContain('requires a content-aware executor');
+      }
+    });
+  });
 });
