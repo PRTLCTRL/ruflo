@@ -2075,6 +2075,51 @@ class ABDifferentialExecutor implements IContentAwareExecutor {
 }
 
 describe('abBenchmark', () => {
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      // Create a non-content-aware executor (no setContext method)
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        });
+      }).rejects.toThrow(/content-aware executor/i);
+    });
+
+    it('throws error mentioning zero-delta when executor lacks setContext', async () => {
+      class BasicExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new BasicExecutor(),
+        });
+      }).rejects.toThrow(/zero-delta/i);
+    });
+
+    it('throws error mentioning token cost when executor is not content-aware', async () => {
+      class SimpleExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new SimpleExecutor(),
+        });
+      }).rejects.toThrow(/token/i);
+    });
+  });
+
   describe('task inventory', () => {
     it('provides 20 default tasks', () => {
       const tasks = getDefaultABTasks();
