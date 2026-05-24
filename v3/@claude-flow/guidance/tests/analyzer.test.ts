@@ -2075,6 +2075,51 @@ class ABDifferentialExecutor implements IContentAwareExecutor {
 }
 
 describe('abBenchmark', () => {
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      // Create a non-content-aware executor (missing setContext method)
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'mock output', stderr: '', exitCode: 0 };
+        },
+      };
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        })
+      ).rejects.toThrow(/content-aware executor/i);
+    });
+
+    it('error message explains the architectural issue', async () => {
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'mock output', stderr: '', exitCode: 0 };
+        },
+      };
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        })
+      ).rejects.toThrow(/zero delta/i);
+    });
+
+    it('error message mentions the cost implication', async () => {
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'mock output', stderr: '', exitCode: 0 };
+        },
+      };
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        })
+      ).rejects.toThrow(/\$23/);
+    });
+  });
+
   describe('task inventory', () => {
     it('provides 20 default tasks', () => {
       const tasks = getDefaultABTasks();

@@ -3131,6 +3131,27 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // ── Guard: Executor must be content-aware ──────────────────────────
+  // Without setContext, both configs will read the same on-disk CLAUDE.md,
+  // guaranteeing a zero delta regardless of content.
+  if (!contentAware) {
+    throw new Error(
+      'A/B benchmark requires a content-aware executor.\n' +
+      '\n' +
+      'The provided executor does not implement IContentAwareExecutor (missing setContext method).\n' +
+      'Without this, both Config A and Config B will read the same on-disk CLAUDE.md file,\n' +
+      'producing an architecturally guaranteed zero delta.\n' +
+      '\n' +
+      'To fix this:\n' +
+      '  1. Use the default executor (DefaultHeadlessExecutor) which is content-aware, OR\n' +
+      '  2. Implement IContentAwareExecutor with a setContext(content: string) method\n' +
+      '     that isolates Config A (empty string) from Config B (provided claudeMdContent).\n' +
+      '\n' +
+      'This check prevents spending ~$23 and 40+ minutes on a benchmark that\n' +
+      'cannot produce meaningful results with the current executor.'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');
