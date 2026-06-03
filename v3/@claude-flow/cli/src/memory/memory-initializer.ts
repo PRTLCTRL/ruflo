@@ -1487,6 +1487,7 @@ interface EmbeddingModel {
   model: unknown;
   tokenizer: unknown;
   dimensions: number;
+  modelName?: string;
 }
 
 let embeddingModelState: EmbeddingModel | null = null;
@@ -1528,7 +1529,8 @@ export async function loadEmbeddingModel(options?: {
         loaded: true,
         model: null, // Bridge handles embedding
         tokenizer: null,
-        dimensions: bridgeResult.dimensions
+        dimensions: bridgeResult.dimensions,
+        modelName: bridgeResult.modelName
       };
       return bridgeResult;
     }
@@ -1551,7 +1553,8 @@ export async function loadEmbeddingModel(options?: {
         loaded: true,
         model: embedder,
         tokenizer: null,
-        dimensions: 384 // MiniLM-L6 produces 384-dim vectors
+        dimensions: 384, // MiniLM-L6 produces 384-dim vectors
+        modelName: 'Xenova/all-MiniLM-L6-v2'
       };
 
       return {
@@ -1574,7 +1577,8 @@ export async function loadEmbeddingModel(options?: {
         loaded: true,
         model: { embed: reasoningBank.computeEmbedding },
         tokenizer: null,
-        dimensions: 768
+        dimensions: 768,
+        modelName: 'agentic-flow/reasoningbank'
       };
 
       return {
@@ -1608,7 +1612,8 @@ export async function loadEmbeddingModel(options?: {
               loaded: true,
               model: (text: string) => onnxEmb.embed(text),
               tokenizer: null,
-              dimensions: probe.length || 384
+              dimensions: probe.length || 384,
+              modelName: 'ruvector/onnx'
             };
             return {
               success: true,
@@ -1635,7 +1640,8 @@ export async function loadEmbeddingModel(options?: {
         loaded: true,
         model: (agenticFlow as any).embeddings,
         tokenizer: null,
-        dimensions: 768
+        dimensions: 768,
+        modelName: 'agentic-flow'
       };
 
       return {
@@ -1651,7 +1657,8 @@ export async function loadEmbeddingModel(options?: {
       loaded: true,
       model: null, // Will use simple hash-based fallback
       tokenizer: null,
-      dimensions: 128 // Smaller fallback dimensions
+      dimensions: 128, // Smaller fallback dimensions
+      modelName: 'hash-fallback'
     };
 
     return {
@@ -1667,6 +1674,70 @@ export async function loadEmbeddingModel(options?: {
       modelName: 'none',
       error: error instanceof Error ? error.message : String(error)
     };
+  }
+}
+
+/**
+ * Get current embedding model info without loading it
+ * Returns info about which provider is selected and its configuration
+ */
+export async function getEmbeddingModelInfo(): Promise<{
+  provider: string;
+  dimensions: number;
+  semantic: boolean;
+  loaded: boolean;
+}> {
+  // If already loaded, return cached info
+  if (embeddingModelState?.loaded) {
+    return {
+      provider: embeddingModelState.modelName || 'unknown',
+      dimensions: embeddingModelState.dimensions,
+      semantic: embeddingModelState.modelName !== 'hash-fallback' && embeddingModelState.modelName !== 'none',
+      loaded: true
+    };
+  }
+
+  // ADR-053: Check if AgentDB v3 bridge is available
+  const bridge = await getBridge();
+  if (bridge) {
+    const bridgeResult = await bridge.bridgeLoadEmbeddingModel?.();
+    if (bridgeResult && bridgeResult.success) {
+      return {
+        provider: bridgeResult.modelName,
+        dimensions: bridgeResult.dimensions,
+        semantic: bridgeResult.modelName !== 'hash-fallback' && bridgeResult.modelName !== 'none',
+        loaded: false
+      };
+    }
+  }
+
+  // Check which provider would be loaded (without actually loading)
+  // Try imports in the same order as loadEmbeddingModel
+  try {
+    const transformers = await import('@xenova/transformers').catch(() => null);
+    if (transformers) {
+      return { provider: 'Xenova/all-MiniLM-L6-v2', dimensions: 384, semantic: true, loaded: false };
+    }
+
+    const reasoningBank = await import('agentic-flow/reasoningbank').catch(() => null);
+    if (reasoningBank?.computeEmbedding) {
+      return { provider: 'agentic-flow/reasoningbank', dimensions: 768, semantic: true, loaded: false };
+    }
+
+    const ruvector = await import('ruvector').catch(() => null);
+    if (ruvector?.initOnnxEmbedder) {
+      return { provider: 'ruvector/onnx', dimensions: 384, semantic: true, loaded: false };
+    }
+
+    const agenticFlow = await import('agentic-flow').catch(() => null);
+    if (agenticFlow && (agenticFlow as any).embeddings) {
+      return { provider: 'agentic-flow', dimensions: 768, semantic: true, loaded: false };
+    }
+
+    // Fallback
+    return { provider: 'hash-fallback', dimensions: 128, semantic: false, loaded: false };
+  } catch {
+    return { provider: 'none', dimensions: 0, semantic: false, loaded: false };
   }
 }
 

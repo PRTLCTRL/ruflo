@@ -569,11 +569,13 @@ export const memoryTools: MCPTool[] = [
     },
     handler: async () => {
       await ensureInitialized();
-      const { checkMemoryInitialization, listEntries } = await getMemoryFunctions();
+      const { checkMemoryInitialization, listEntries, getEmbeddingModelInfo, getHNSWStatus } = await getMemoryFunctions();
 
       try {
         const status = await checkMemoryInitialization();
         const allEntries = await listEntries({ limit: 100000 });
+        const embeddingInfo = await getEmbeddingModelInfo();
+        const hnswStatus = getHNSWStatus();
 
         // Count by namespace
         const namespaces: Record<string, number> = {};
@@ -598,6 +600,17 @@ export const memoryTools: MCPTool[] = [
             vectorEmbeddings: true,
             hnswIndex: true,
             semanticSearch: true,
+          },
+          embedding: {
+            provider: embeddingInfo.provider,
+            dimensions: embeddingInfo.dimensions,
+            semantic: embeddingInfo.semantic,
+            loaded: embeddingInfo.loaded,
+          },
+          hnsw: {
+            available: hnswStatus.available,
+            initialized: hnswStatus.initialized,
+            entryCount: hnswStatus.entryCount,
           },
         };
       } catch (error) {
