@@ -605,7 +605,26 @@ interface HeadlessBenchmarkTask {
   expectPresent: string[];
 }
 
-class DefaultHeadlessExecutor implements IContentAwareExecutor {
+/**
+ * Default content-aware executor for A/B benchmarking.
+ *
+ * This executor implements setContext() by physically swapping the CLAUDE.md file
+ * on disk. For Config A (no control plane), it removes or empties CLAUDE.md. For
+ * Config B (with control plane), it writes the provided content to CLAUDE.md.
+ *
+ * This ensures that `claude -p` commands executed in each config actually see
+ * different guidance content, enabling meaningful A/B comparison.
+ *
+ * @example
+ * ```ts
+ * import { abBenchmark, DefaultHeadlessExecutor } from '@claude-flow/guidance';
+ *
+ * const report = await abBenchmark(claudeMdContent, {
+ *   executor: new DefaultHeadlessExecutor(),
+ * });
+ * ```
+ */
+export class DefaultHeadlessExecutor implements IContentAwareExecutor {
   private contextContent: string | null = null;
 
   setContext(claudeMdContent: string): void {
@@ -3130,6 +3149,25 @@ export async function abBenchmark(
   } = options;
 
   const contentAware = isContentAwareExecutor(executor);
+
+  // ── Guard: Prevent meaningless benchmark with non-content-aware executor ───
+  // If the executor can't isolate Config A from B, both configs will read the
+  // same on-disk CLAUDE.md, guaranteeing delta = 0. This wastes ~$23 on a
+  // meaningless comparison (20 tasks × 2 configs × ~$0.58/call on Opus 4.7).
+  if (!contentAware) {
+    const estimatedCost = tasks.length * 2 * 0.58;
+    throw new Error(
+      `Cannot run A/B benchmark with non-content-aware executor.\n\n` +
+      `Problem: The executor doesn't implement setContext(), so both configs ` +
+      `will read the same CLAUDE.md file from disk. This guarantees delta = 0 ` +
+      `and wastes ~$${estimatedCost.toFixed(2)} on ${tasks.length * 2} calls.\n\n` +
+      `Solution:\n` +
+      `  1. Use DefaultHeadlessExecutor (implements setContext with file swapping)\n` +
+      `  2. Pass a custom executor that implements IContentAwareExecutor\n` +
+      `  3. Upgrade to @claude-flow/guidance@3.0.0-alpha.2 or later\n\n` +
+      `For details, see https://github.com/ruvnet/ruflo/issues/1652`
+    );
+  }
 
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)

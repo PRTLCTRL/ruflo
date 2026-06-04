@@ -314,6 +314,7 @@ export {
   getDefaultABTasks,
   formatReport,
   formatBenchmark,
+  DefaultHeadlessExecutor,
 } from './analyzer.js';
 export type {
   AnalysisResult,

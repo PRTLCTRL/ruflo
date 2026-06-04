@@ -2465,4 +2465,66 @@ describe('abBenchmark', () => {
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
   });
+
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(_prompt: string, _workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/cannot run A\/B benchmark with non-content-aware executor/i);
+    });
+
+    it('error message includes cost estimate', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(_prompt: string, _workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+          tasks: [
+            {
+              id: 'test-1',
+              description: 'Test',
+              taskClass: 'bug-fix',
+              prompt: 'Test prompt',
+              assertions: [{ type: 'must-contain', value: 'test', severity: 'critical' }],
+              gatePatterns: [],
+            },
+          ],
+        })
+      ).rejects.toThrow(/\$\d+\.\d+/);
+    });
+
+    it('error message references GitHub issue', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(_prompt: string, _workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/github\.com\/ruvnet\/ruflo\/issues\/1652/);
+    });
+
+    it('allows content-aware executor to proceed', async () => {
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: new ABDifferentialExecutor(),
+      });
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+  });
 });
