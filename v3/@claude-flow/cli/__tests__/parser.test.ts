@@ -27,42 +27,42 @@ describe('CommandParser', () => {
   // Basic flag parsing
   // -------------------------------------------------------------------------
   describe('flag parsing', () => {
-    it('should parse long boolean flag', () => {
-      const result = parser.parse(['--verbose']);
+    it('should parse long boolean flag', async () => {
+      const result = await await parser.parse(['--verbose']);
       expect(result.flags.verbose).toBe(true);
     });
 
-    it('should parse --flag=value syntax', () => {
-      const result = parser.parse(['--output=file.txt']);
+    it('should parse --flag=value syntax', async () => {
+      const result = await await parser.parse(['--output=file.txt']);
       expect(result.flags.output).toBe('file.txt');
     });
 
-    it('should parse --flag value syntax (non-boolean)', () => {
+    it('should parse --flag value syntax (non-boolean)', async () => {
       // Register a command so the positional "hello" doesn't get treated as command
-      const result = parser.parse(['--name', 'hello']);
+      const result = await await parser.parse(['--name', 'hello']);
       expect(result.flags.name).toBe('hello');
     });
 
-    it('should parse --no-flag as boolean false', () => {
-      const result = parser.parse(['--no-color']);
+    it('should parse --no-flag as boolean false', async () => {
+      const result = await await parser.parse(['--no-color']);
       expect(result.flags.color).toBe(false);
     });
 
-    it('should parse short flag -V via global alias', () => {
-      const result = parser.parse(['-V']);
+    it('should parse short flag -V via global alias', async () => {
+      const result = await await parser.parse(['-V']);
       expect(result.flags.version).toBe(true);
     });
 
-    it('should parse combined short flags like -abc', () => {
-      const result = parser.parse(['-abc']);
+    it('should parse combined short flags like -abc', async () => {
+      const result = await await parser.parse(['-abc']);
       expect(result.flags.a).toBe(true);
       expect(result.flags.b).toBe(true);
       // Note: 'c' is aliased to 'config' by global options, so the key is 'config'
       expect(result.flags.config).toBe(true);
     });
 
-    it('should stop parsing flags after "--"', () => {
-      const result = parser.parse(['--verbose', '--', '--not-a-flag']);
+    it('should stop parsing flags after "--"', async () => {
+      const result = await await parser.parse(['--verbose', '--', '--not-a-flag']);
       expect(result.flags.verbose).toBe(true);
       expect(result.flags.notAFlag).toBeUndefined();
       expect(result.positional).toContain('--not-a-flag');
@@ -73,38 +73,38 @@ describe('CommandParser', () => {
   // Value coercion via parseValue
   // -------------------------------------------------------------------------
   describe('value coercion', () => {
-    it('should coerce "true" to boolean true', () => {
-      const result = parser.parse(['--flag=true']);
+    it('should coerce "true" to boolean true', async () => {
+      const result = await parser.parse(['--flag=true']);
       expect(result.flags.flag).toBe(true);
     });
 
-    it('should coerce "false" to boolean false', () => {
-      const result = parser.parse(['--flag=false']);
+    it('should coerce "false" to boolean false', async () => {
+      const result = await parser.parse(['--flag=false']);
       expect(result.flags.flag).toBe(false);
     });
 
-    it('should coerce numeric strings to numbers', () => {
-      const result = parser.parse(['--count=42']);
+    it('should coerce numeric strings to numbers', async () => {
+      const result = await parser.parse(['--count=42']);
       expect(result.flags.count).toBe(42);
     });
 
-    it('should coerce decimal strings to numbers', () => {
-      const result = parser.parse(['--ratio=3.14']);
+    it('should coerce decimal strings to numbers', async () => {
+      const result = await parser.parse(['--ratio=3.14']);
       expect(result.flags.ratio).toBe(3.14);
     });
 
-    it('should keep non-numeric strings as strings', () => {
-      const result = parser.parse(['--label=hello']);
+    it('should keep non-numeric strings as strings', async () => {
+      const result = await parser.parse(['--label=hello']);
       expect(result.flags.label).toBe('hello');
     });
 
-    it('should coerce "TRUE" case-insensitively', () => {
-      const result = parser.parse(['--flag=TRUE']);
+    it('should coerce "TRUE" case-insensitively', async () => {
+      const result = await parser.parse(['--flag=TRUE']);
       expect(result.flags.flag).toBe(true);
     });
 
-    it('should coerce "FALSE" case-insensitively', () => {
-      const result = parser.parse(['--flag=FALSE']);
+    it('should coerce "FALSE" case-insensitively', async () => {
+      const result = await parser.parse(['--flag=FALSE']);
       expect(result.flags.flag).toBe(false);
     });
   });
@@ -113,13 +113,13 @@ describe('CommandParser', () => {
   // normalizeKey (kebab-case to camelCase)
   // -------------------------------------------------------------------------
   describe('key normalization', () => {
-    it('should convert kebab-case keys to camelCase', () => {
-      const result = parser.parse(['--some-long-flag=yes']);
+    it('should convert kebab-case keys to camelCase', async () => {
+      const result = await parser.parse(['--some-long-flag=yes']);
       expect(result.flags.someLongFlag).toBe('yes');
     });
 
-    it('should leave simple keys unchanged', () => {
-      const result = parser.parse(['--simple=val']);
+    it('should leave simple keys unchanged', async () => {
+      const result = await parser.parse(['--simple=val']);
       expect(result.flags.simple).toBe('val');
     });
   });
@@ -128,53 +128,53 @@ describe('CommandParser', () => {
   // Command & subcommand resolution
   // -------------------------------------------------------------------------
   describe('command resolution', () => {
-    it('should detect registered command', () => {
+    it('should detect registered command', async () => {
       const cmd: Command = { name: 'agent', description: 'Agent mgmt' };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['agent']);
+      const result = await parser.parse(['agent']);
       expect(result.command).toEqual(['agent']);
     });
 
-    it('should detect subcommand', () => {
+    it('should detect subcommand', async () => {
       const sub: Command = { name: 'spawn', description: 'Spawn agent' };
       const cmd: Command = { name: 'agent', description: 'Agent mgmt', subcommands: [sub] };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['agent', 'spawn']);
+      const result = await parser.parse(['agent', 'spawn']);
       expect(result.command).toEqual(['agent', 'spawn']);
     });
 
-    it('should detect nested subcommand (3 levels)', () => {
+    it('should detect nested subcommand (3 levels)', async () => {
       const deep: Command = { name: 'run', description: 'Run it' };
       const mid: Command = { name: 'worker', description: 'Worker', subcommands: [deep] };
       const top: Command = { name: 'hooks', description: 'Hooks', subcommands: [mid] };
       parser.registerCommand(top);
 
-      const result = parser.parse(['hooks', 'worker', 'run']);
+      const result = await parser.parse(['hooks', 'worker', 'run']);
       expect(result.command).toEqual(['hooks', 'worker', 'run']);
     });
 
-    it('should resolve subcommand by alias', () => {
+    it('should resolve subcommand by alias', async () => {
       const sub: Command = { name: 'list', aliases: ['ls'], description: 'List items' };
       const cmd: Command = { name: 'agent', description: 'Agent mgmt', subcommands: [sub] };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['agent', 'ls']);
+      const result = await parser.parse(['agent', 'ls']);
       expect(result.command).toEqual(['agent', 'ls']);
     });
 
-    it('should treat unregistered words as positional args', () => {
-      const result = parser.parse(['unknown', 'thing']);
+    it('should treat unregistered words as positional args', async () => {
+      const result = await parser.parse(['unknown', 'thing']);
       expect(result.command).toEqual([]);
       expect(result.positional).toEqual(['unknown', 'thing']);
     });
 
-    it('should register command aliases', () => {
+    it('should register command aliases', async () => {
       const cmd: Command = { name: 'config', aliases: ['cfg'], description: 'Config' };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['cfg']);
+      const result = await parser.parse(['cfg']);
       expect(result.command).toEqual(['cfg']);
     });
   });
@@ -183,17 +183,17 @@ describe('CommandParser', () => {
   // Positional arguments
   // -------------------------------------------------------------------------
   describe('positional arguments', () => {
-    it('should collect positional args after command', () => {
+    it('should collect positional args after command', async () => {
       const cmd: Command = { name: 'task', description: 'Task mgmt' };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['task', 'arg1', 'arg2']);
+      const result = await parser.parse(['task', 'arg1', 'arg2']);
       expect(result.positional).toEqual(['arg1', 'arg2']);
       expect(result.flags._).toEqual(['arg1', 'arg2']);
     });
 
-    it('should collect args after "--" as positional', () => {
-      const result = parser.parse(['--', 'a', 'b']);
+    it('should collect args after "--" as positional', async () => {
+      const result = await parser.parse(['--', 'a', 'b']);
       expect(result.positional).toEqual(['a', 'b']);
     });
   });
@@ -202,8 +202,8 @@ describe('CommandParser', () => {
   // Defaults
   // -------------------------------------------------------------------------
   describe('defaults', () => {
-    it('should apply global option defaults', () => {
-      const result = parser.parse([]);
+    it('should apply global option defaults', async () => {
+      const result = await parser.parse([]);
       // Global defaults from initializeGlobalOptions
       expect(result.flags.help).toBe(false);
       expect(result.flags.version).toBe(false);
@@ -212,17 +212,17 @@ describe('CommandParser', () => {
       expect(result.flags.interactive).toBe(true);
     });
 
-    it('should not overwrite explicitly set flags with defaults', () => {
-      const result = parser.parse(['--verbose']);
+    it('should not overwrite explicitly set flags with defaults', async () => {
+      const result = await parser.parse(['--verbose']);
       expect(result.flags.verbose).toBe(true);
     });
 
-    it('should apply custom defaults from options', () => {
+    it('should apply custom defaults from options', async () => {
       const p = new CommandParser({
         allowUnknownFlags: true,
         defaults: { myFlag: 'default-value' },
       });
-      const result = p.parse([]);
+      const result = await p.parse([]);
       expect(result.flags.myFlag).toBe('default-value');
     });
   });
@@ -231,7 +231,7 @@ describe('CommandParser', () => {
   // Alias resolution from command options
   // -------------------------------------------------------------------------
   describe('alias resolution', () => {
-    it('should resolve short flags from command options', () => {
+    it('should resolve short flags from command options', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -239,11 +239,11 @@ describe('CommandParser', () => {
       };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['test', '-d']);
+      const result = await parser.parse(['test', '-d']);
       expect(result.flags.debug).toBe(true);
     });
 
-    it('should resolve short flags from subcommand options', () => {
+    it('should resolve short flags from subcommand options', async () => {
       const sub: Command = {
         name: 'run',
         description: 'Run',
@@ -252,7 +252,7 @@ describe('CommandParser', () => {
       const cmd: Command = { name: 'task', description: 'Task', subcommands: [sub] };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['task', 'run', '-t', '5000']);
+      const result = await parser.parse(['task', 'run', '-t', '5000']);
       expect(result.flags.timeout).toBe(5000);
     });
   });
@@ -261,7 +261,7 @@ describe('CommandParser', () => {
   // validateFlags
   // -------------------------------------------------------------------------
   describe('validateFlags', () => {
-    it('should return empty array for valid flags', () => {
+    it('should return empty array for valid flags', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -271,7 +271,7 @@ describe('CommandParser', () => {
       expect(errors).toEqual([]);
     });
 
-    it('should report missing required flags', () => {
+    it('should report missing required flags', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -285,7 +285,7 @@ describe('CommandParser', () => {
       expect(errors[0]).toContain('--name');
     });
 
-    it('should report invalid choice values', () => {
+    it('should report invalid choice values', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -299,7 +299,7 @@ describe('CommandParser', () => {
       expect(errors[0]).toContain('xml');
     });
 
-    it('should accept valid choice values', () => {
+    it('should accept valid choice values', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -311,7 +311,7 @@ describe('CommandParser', () => {
       expect(errors).toEqual([]);
     });
 
-    it('should run custom validator returning string error', () => {
+    it('should run custom validator returning string error', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -329,7 +329,7 @@ describe('CommandParser', () => {
       expect(errors[0]).toBe('Port must be positive');
     });
 
-    it('should run custom validator returning false', () => {
+    it('should run custom validator returning false', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -347,14 +347,14 @@ describe('CommandParser', () => {
       expect(errors[0]).toContain('Invalid value for --count');
     });
 
-    it('should report unknown flags when allowUnknownFlags is false', () => {
+    it('should report unknown flags when allowUnknownFlags is false', async () => {
       const strictParser = new CommandParser({ allowUnknownFlags: false });
       const errors = strictParser.validateFlags({ _: [], unknown: true });
       expect(errors.length).toBeGreaterThan(0);
       expect(errors.some(e => e.includes('Unknown option'))).toBe(true);
     });
 
-    it('should not report unknown flags when allowUnknownFlags is true', () => {
+    it('should not report unknown flags when allowUnknownFlags is true', async () => {
       // Default parser allows unknown flags
       const errors = parser.validateFlags({ _: [], unknown: true });
       expect(errors).toEqual([]);
@@ -365,7 +365,7 @@ describe('CommandParser', () => {
   // getAllCommands
   // -------------------------------------------------------------------------
   describe('getAllCommands', () => {
-    it('should return unique commands (no duplicates from aliases)', () => {
+    it('should return unique commands (no duplicates from aliases)', async () => {
       const cmd: Command = { name: 'config', aliases: ['cfg', 'conf'], description: 'Config' };
       parser.registerCommand(cmd);
 
@@ -374,7 +374,7 @@ describe('CommandParser', () => {
       expect(configCmds.length).toBe(1);
     });
 
-    it('should return all registered commands', () => {
+    it('should return all registered commands', async () => {
       parser.registerCommand({ name: 'agent', description: 'Agent' });
       parser.registerCommand({ name: 'swarm', description: 'Swarm' });
       parser.registerCommand({ name: 'memory', description: 'Memory' });
@@ -388,21 +388,21 @@ describe('CommandParser', () => {
   // getCommand
   // -------------------------------------------------------------------------
   describe('getCommand', () => {
-    it('should return command by name', () => {
+    it('should return command by name', async () => {
       const cmd: Command = { name: 'agent', description: 'Agent' };
       parser.registerCommand(cmd);
 
       expect(parser.getCommand('agent')).toBe(cmd);
     });
 
-    it('should return command by alias', () => {
+    it('should return command by alias', async () => {
       const cmd: Command = { name: 'config', aliases: ['cfg'], description: 'Config' };
       parser.registerCommand(cmd);
 
       expect(parser.getCommand('cfg')).toBe(cmd);
     });
 
-    it('should return undefined for unregistered command', () => {
+    it('should return undefined for unregistered command', async () => {
       expect(parser.getCommand('nonexistent')).toBeUndefined();
     });
   });
@@ -411,7 +411,7 @@ describe('CommandParser', () => {
   // getGlobalOptions
   // -------------------------------------------------------------------------
   describe('getGlobalOptions', () => {
-    it('should return a copy of global options', () => {
+    it('should return a copy of global options', async () => {
       const opts = parser.getGlobalOptions();
       expect(opts.length).toBeGreaterThan(0);
       expect(opts.some(o => o.name === 'help')).toBe(true);
@@ -429,9 +429,9 @@ describe('CommandParser', () => {
   // raw preservation
   // -------------------------------------------------------------------------
   describe('raw args', () => {
-    it('should preserve the original args array in raw', () => {
+    it('should preserve the original args array in raw', async () => {
       const args = ['agent', 'spawn', '--type', 'coder', '--verbose'];
-      const result = parser.parse(args);
+      const result = await parser.parse(args);
       expect(result.raw).toEqual(args);
     });
   });
@@ -440,7 +440,7 @@ describe('CommandParser', () => {
   // Boolean flag from registered command
   // -------------------------------------------------------------------------
   describe('boolean flag from command options', () => {
-    it('should recognize command-level boolean flags', () => {
+    it('should recognize command-level boolean flags', async () => {
       const cmd: Command = {
         name: 'run',
         description: 'Run',
@@ -448,11 +448,11 @@ describe('CommandParser', () => {
       };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['run', '--force']);
+      const result = await parser.parse(['run', '--force']);
       expect(result.flags.force).toBe(true);
     });
 
-    it('should recognize boolean flags from subcommand options', () => {
+    it('should recognize boolean flags from subcommand options', async () => {
       const sub: Command = {
         name: 'stop',
         description: 'Stop',
@@ -461,7 +461,7 @@ describe('CommandParser', () => {
       const cmd: Command = { name: 'agent', description: 'Agent', subcommands: [sub] };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['agent', 'stop', '--graceful']);
+      const result = await parser.parse(['agent', 'stop', '--graceful']);
       expect(result.flags.graceful).toBe(true);
     });
   });
@@ -470,12 +470,12 @@ describe('CommandParser', () => {
   // booleanFlags from constructor options
   // -------------------------------------------------------------------------
   describe('booleanFlags option', () => {
-    it('should recognize custom boolean flags passed via constructor', () => {
+    it('should recognize custom boolean flags passed via constructor', async () => {
       const p = new CommandParser({
         allowUnknownFlags: true,
         booleanFlags: ['my-custom-flag'],
       });
-      const result = p.parse(['--my-custom-flag']);
+      const result = await p.parse(['--my-custom-flag']);
       expect(result.flags.myCustomFlag).toBe(true);
     });
   });
@@ -485,45 +485,45 @@ describe('CommandParser', () => {
   // the core `start` command when `daemon` is a lazy-loaded command.
   // -------------------------------------------------------------------------
   describe('lazy command routing (#1596)', () => {
-    it('should not mis-route "daemon start" to the sync "start" command', () => {
+    it('should not mis-route "daemon start" to the sync "start" command', async () => {
       const p = new CommandParser({ allowUnknownFlags: true });
       // Sync command "start" is registered with full definition
       p.registerCommand({ name: 'start', description: 'Top-level start', handler: async () => ({ success: true }) } as Command);
       // "daemon" is lazy — only its name is registered
       p.registerLazyCommandName('daemon');
 
-      const result = p.parse(['daemon', 'start', '--foreground']);
+      const result = await p.parse(['daemon', 'start', '--foreground']);
       expect(result.command[0]).toBe('daemon');
       expect(result.positional[0]).toBe('start');
       expect(result.flags.foreground).toBe(true);
     });
 
-    it('should still recognize bare "start" as the sync start command', () => {
+    it('should still recognize bare "start" as the sync start command', async () => {
       const p = new CommandParser({ allowUnknownFlags: true });
       p.registerCommand({ name: 'start', description: 'Top-level start', handler: async () => ({ success: true }) } as Command);
       p.registerLazyCommandName('daemon');
 
-      const result = p.parse(['start']);
+      const result = await p.parse(['start']);
       expect(result.command[0]).toBe('start');
       expect(result.positional).toHaveLength(0);
     });
 
-    it('should route lazy command even when a global flag comes first', () => {
+    it('should route lazy command even when a global flag comes first', async () => {
       const p = new CommandParser({ allowUnknownFlags: true });
       p.registerCommand({ name: 'start', description: '', handler: async () => ({}) } as Command);
       p.registerLazyCommandName('daemon');
 
-      const result = p.parse(['-v', 'daemon', 'start', '--foreground']);
+      const result = await p.parse(['-v', 'daemon', 'start', '--foreground']);
       expect(result.command[0]).toBe('daemon');
       expect(result.positional[0]).toBe('start');
       expect(result.flags.verbose).toBe(true);
     });
 
-    it('should resolve bare lazy command (e.g. "doctor")', () => {
+    it('should resolve bare lazy command (e.g. "doctor")', async () => {
       const p = new CommandParser({ allowUnknownFlags: true });
       p.registerLazyCommandName('doctor');
 
-      const result = p.parse(['doctor']);
+      const result = await p.parse(['doctor']);
       expect(result.command[0]).toBe('doctor');
     });
   });
@@ -532,7 +532,7 @@ describe('CommandParser', () => {
   // Edge: short flag with value
   // -------------------------------------------------------------------------
   describe('short flag with value', () => {
-    it('should parse single short non-boolean flag followed by value', () => {
+    it('should parse single short non-boolean flag followed by value', async () => {
       const cmd: Command = {
         name: 'test',
         description: 'Test',
@@ -540,8 +540,96 @@ describe('CommandParser', () => {
       };
       parser.registerCommand(cmd);
 
-      const result = parser.parse(['test', '-t', 'coder']);
+      const result = await await parser.parse(['test', '-t', 'coder']);
       expect(result.flags.type).toBe('coder');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // #1651: lazy command subcommand short flags — `guidance retrieve -t "task"`
+  // must resolve -t to --task even though guidance is lazy-loaded.
+  // -------------------------------------------------------------------------
+  describe('lazy command subcommand short flags (#1651)', () => {
+    it('should resolve short flags from lazy command subcommand options', async () => {
+      const p = new CommandParser({ allowUnknownFlags: true });
+
+      // Setup: guidance is lazy, with a retrieve subcommand that has -t short flag
+      const retrieveSubcommand: Command = {
+        name: 'retrieve',
+        description: 'Retrieve guidance',
+        options: [
+          { name: 'task', short: 't', type: 'string', required: true, description: 'Task description' },
+          { name: 'root', short: 'r', type: 'string', description: 'Root path' },
+        ],
+      };
+      const guidanceCommand: Command = {
+        name: 'guidance',
+        description: 'Guidance control plane',
+        subcommands: [retrieveSubcommand],
+      };
+
+      // Register guidance as lazy
+      p.registerLazyCommandName('guidance');
+
+      // Set up loader that returns the full command definition
+      p.setLazyCommandLoader(async (name: string) => {
+        if (name === 'guidance') {
+          return guidanceCommand;
+        }
+        return undefined;
+      });
+
+      // Parse: guidance retrieve -t "Fix auth bug"
+      const result = await await p.parse(['guidance', 'retrieve', '-t', 'Fix auth bug']);
+
+      // Verify: -t was resolved to task
+      expect(result.command).toEqual(['guidance', 'retrieve']);
+      expect(result.flags.task).toBe('Fix auth bug');
+      expect(result.flags.t).toBeUndefined(); // Should not be literal 't'
+    });
+
+    it('should handle lazy command with multiple subcommand short flags', async () => {
+      const p = new CommandParser({ allowUnknownFlags: true });
+
+      const gatesSubcommand: Command = {
+        name: 'gates',
+        description: 'Evaluate gates',
+        options: [
+          { name: 'command', short: 'c', type: 'string', description: 'Command to check' },
+          { name: 'content', type: 'string', description: 'Content to check' },
+        ],
+      };
+      const guidanceCommand: Command = {
+        name: 'guidance',
+        description: 'Guidance control plane',
+        subcommands: [gatesSubcommand],
+      };
+
+      p.registerLazyCommandName('guidance');
+      p.setLazyCommandLoader(async (name: string) => {
+        return name === 'guidance' ? guidanceCommand : undefined;
+      });
+
+      const result = await await p.parse(['guidance', 'gates', '-c', 'rm -rf /']);
+
+      expect(result.command).toEqual(['guidance', 'gates']);
+      expect(result.flags.command).toBe('rm -rf /');
+      expect(result.flags.c).toBeUndefined();
+    });
+
+    it('should fall back gracefully if lazy command loader fails', async () => {
+      const p = new CommandParser({ allowUnknownFlags: true });
+
+      p.registerLazyCommandName('missing');
+      p.setLazyCommandLoader(async () => {
+        return undefined; // Simulate loader failure
+      });
+
+      const result = await await p.parse(['missing', 'subcommand', '-t', 'value']);
+
+      // Should treat as positional since command couldn't be loaded
+      expect(result.command).toEqual(['missing']);
+      expect(result.positional).toContain('subcommand');
     });
   });
 });
