@@ -3131,6 +3131,26 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // ── Validate executor capability ───────────────────────────────────────
+  // A/B benchmarking requires isolating Config A (no guidance) from Config B
+  // (with guidance). Non-content-aware executors read the on-disk CLAUDE.md
+  // for both configs, guaranteeing zero delta regardless of content quality.
+  // Aborting early saves ~$23 in tokens and ~21 minutes of wall time per run.
+  if (!contentAware) {
+    throw new Error(
+      'A/B benchmark requires a content-aware executor.\n' +
+      '\n' +
+      'The default executor cannot isolate Config A from on-disk CLAUDE.md,\n' +
+      'so both configs will read identical guidance and produce zero delta.\n' +
+      '\n' +
+      'To run this benchmark:\n' +
+      '  1. Provide a custom executor that implements IContentAwareExecutor\n' +
+      '  2. Ensure setContext() physically swaps or injects guidance content\n' +
+      '\n' +
+      'See @claude-flow/guidance/analyzer.ts for IContentAwareExecutor interface.'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');
