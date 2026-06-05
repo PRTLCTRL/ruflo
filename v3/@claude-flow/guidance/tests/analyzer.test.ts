@@ -2465,4 +2465,64 @@ describe('abBenchmark', () => {
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
   });
+
+  describe('executor validation', () => {
+    class NonContentAwareExecutor implements IHeadlessExecutor {
+      async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+        return { stdout: 'mock result', stderr: '', exitCode: 0 };
+      }
+    }
+
+    it('throws error when executor is not content-aware', async () => {
+      const nonContentAwareExecutor = new NonContentAwareExecutor();
+      
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        });
+      }).rejects.toThrow('abBenchmark requires a content-aware executor');
+    });
+
+    it('error message mentions IContentAwareExecutor interface', async () => {
+      const nonContentAwareExecutor = new NonContentAwareExecutor();
+      
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        });
+      }).rejects.toThrow('IContentAwareExecutor');
+    });
+
+    it('error message includes fix suggestions', async () => {
+      const nonContentAwareExecutor = new NonContentAwareExecutor();
+      
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+        });
+        expect.fail('Should have thrown error');
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain('DefaultHeadlessExecutor');
+        expect(message).toContain('setContext');
+        expect(message).toContain('zero-delta');
+      }
+    });
+
+    it('does not throw when executor is content-aware', async () => {
+      const result = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: new ABDifferentialExecutor(),
+      });
+      expect(result).toBeDefined();
+      expect(result.configA).toBeDefined();
+      expect(result.configB).toBeDefined();
+    });
+
+    it('default executor is content-aware and does not throw', async () => {
+      const result = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD);
+      expect(result).toBeDefined();
+      expect(result.configA).toBeDefined();
+      expect(result.configB).toBeDefined();
+    });
+  });
 });
