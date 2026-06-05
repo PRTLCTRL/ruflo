@@ -2118,6 +2118,50 @@ describe('abBenchmark', () => {
     });
   });
 
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(_prompt: string, _workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'test', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow('A/B benchmark requires a content-aware executor');
+    });
+
+    it('error message mentions upgrading to alpha.3', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(_prompt: string, _workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'test', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow('Upgrade to @claude-flow/guidance@3.0.0-alpha.3');
+    });
+
+    it('error message includes issue reference', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(_prompt: string, _workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'test', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow('https://github.com/ruvnet/ruflo/issues/1652');
+    });
+  });
+
   describe('A/B execution with differential executor', () => {
     it('returns a complete ABReport', async () => {
       const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {

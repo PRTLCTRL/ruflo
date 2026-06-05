@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ---
 
+## [3.0.0-alpha.3] - 2026-06-05
+
+### 🐛 Bug Fixes
+
+#### Guidance A/B Testing Zero-Delta Fix (#1652)
+- **Issue**: `ruflo guidance ab-test` was producing guaranteed zero-delta results, wasting ~$23 per run
+- **Root Cause**: `DefaultHeadlessExecutor` didn't implement content-aware interface in alpha.1, so both Config A (no guidance) and Config B (with guidance) read the same on-disk CLAUDE.md
+- **Fix**: Added defensive validation to `abBenchmark()` that aborts early with a clear error message if executor lacks content isolation capability
+- **Impact**: Prevents silent failures and token waste; guides users to upgrade or provide proper executor
+- **Note**: `DefaultHeadlessExecutor` already implements `IContentAwareExecutor` correctly in alpha.2+, but validation catches usage of older versions or custom non-content-aware executors
+
+### 📝 Documentation
+- Added comprehensive documentation to `DefaultHeadlessExecutor` explaining file-swapping mechanism
+- Clarified how Config A/B isolation works via backup-swap-restore pattern
+- Included issue reference and implementation details for future maintainers
+
+---
+
 ## [3.0.0-alpha.1] - 2026-01-04
 
 ### 🚀 Major Changes

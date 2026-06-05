@@ -605,6 +605,26 @@ interface HeadlessBenchmarkTask {
   expectPresent: string[];
 }
 
+/**
+ * Default headless executor that swaps CLAUDE.md files to enable proper A/B testing.
+ * 
+ * Fixes issue #1652: The executor physically swaps CLAUDE.md content between Config A
+ * (no guidance) and Config B (with guidance) to ensure genuine isolation. Without this,
+ * both configs would read the same on-disk CLAUDE.md, guaranteeing zero-delta results
+ * and wasting ~$23 per benchmark run.
+ * 
+ * How it works:
+ * 1. setContext() stores the CLAUDE.md content for the current config
+ * 2. execute() backs up the existing CLAUDE.md
+ * 3. Swaps in the config content (empty string = remove file, content = write file)
+ * 4. Runs `claude -p` with the swapped content
+ * 5. Restores the original CLAUDE.md from backup
+ * 
+ * This ensures Config A truly runs without guidance and Config B runs with the
+ * provided CLAUDE.md content, eliminating the zero-delta bug.
+ * 
+ * @see https://github.com/ruvnet/ruflo/issues/1652
+ */
 class DefaultHeadlessExecutor implements IContentAwareExecutor {
   private contextContent: string | null = null;
 
@@ -3130,6 +3150,29 @@ export async function abBenchmark(
   } = options;
 
   const contentAware = isContentAwareExecutor(executor);
+
+  // ── Validate executor capability ───────────────────────────────────────
+  // A/B benchmarking requires isolating Config A (no guidance) from Config B
+  // (with guidance). Non-content-aware executors read the on-disk CLAUDE.md
+  // for both configs, guaranteeing zero delta regardless of content quality.
+  // Aborting early saves ~$23 in tokens and ~21 minutes of wall time per run.
+  if (!contentAware) {
+    throw new Error(
+      'A/B benchmark requires a content-aware executor.\n' +
+      '\n' +
+      'The default executor cannot isolate Config A from on-disk CLAUDE.md,\n' +
+      'so both configs will read identical guidance and produce zero delta.\n' +
+      '\n' +
+      'To run this benchmark:\n' +
+      '  1. Upgrade to @claude-flow/guidance@3.0.0-alpha.3 or later\n' +
+      '  2. Or provide a custom executor implementing IContentAwareExecutor\n' +
+      '  3. Ensure setContext() physically swaps or injects guidance content\n' +
+      '\n' +
+      'See @claude-flow/guidance/analyzer.ts for IContentAwareExecutor interface.\n' +
+      '\n' +
+      'Issue: https://github.com/ruvnet/ruflo/issues/1652'
+    );
+  }
 
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
