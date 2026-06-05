@@ -605,34 +605,21 @@ interface HeadlessBenchmarkTask {
   expectPresent: string[];
 }
 
-class DefaultHeadlessExecutor implements IContentAwareExecutor {
-  private contextContent: string | null = null;
-
-  setContext(claudeMdContent: string): void {
-    this.contextContent = claudeMdContent;
-  }
-
+/**
+ * Default headless executor that runs `claude -p` commands.
+ * 
+ * NOTE: This executor is NOT content-aware. It cannot isolate Config A from
+ * Config B in A/B tests because `claude -p` reads CLAUDE.md from the repository
+ * root (or cached context), not from the working directory.
+ * 
+ * For A/B testing with meaningful results, provide a custom IContentAwareExecutor
+ * implementation that can truly isolate guidance contexts.
+ */
+class DefaultHeadlessExecutor implements IHeadlessExecutor {
   async execute(prompt: string, workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
     const { execFile } = await import('node:child_process');
     const { promisify } = await import('node:util');
-    const fs = await import('node:fs/promises');
-    const { join } = await import('node:path');
     const execFileAsync = promisify(execFile);
-
-    const claudeMdPath = join(workDir, 'CLAUDE.md');
-    const backupPath = join(workDir, '.CLAUDE.md.ab-backup');
-    let swapped = false;
-
-    if (this.contextContent !== null) {
-      try { await fs.copyFile(claudeMdPath, backupPath); } catch { /* no file to back up */ }
-
-      if (this.contextContent.length > 0) {
-        await fs.writeFile(claudeMdPath, this.contextContent, 'utf-8');
-      } else {
-        await fs.unlink(claudeMdPath).catch(() => {});
-      }
-      swapped = true;
-    }
 
     try {
       const { stdout, stderr } = await execFileAsync(
@@ -643,15 +630,6 @@ class DefaultHeadlessExecutor implements IContentAwareExecutor {
       return { stdout, stderr, exitCode: 0 };
     } catch (error: any) {
       return { stdout: error.stdout ?? '', stderr: error.stderr ?? '', exitCode: error.code ?? 1 };
-    } finally {
-      if (swapped) {
-        try {
-          await fs.copyFile(backupPath, claudeMdPath);
-          await fs.unlink(backupPath);
-        } catch {
-          await fs.unlink(claudeMdPath).catch(() => {});
-        }
-      }
     }
   }
 }
@@ -3130,6 +3108,28 @@ export async function abBenchmark(
   } = options;
 
   const contentAware = isContentAwareExecutor(executor);
+
+  // ── Detect non-content-aware executor ──────────────────────────────
+  // Without content isolation, both configs read the same on-disk CLAUDE.md,
+  // producing an architecturally guaranteed zero-delta. Abort before wasting tokens.
+  if (!contentAware) {
+    throw new Error(
+      '❌ A/B testing requires a content-aware executor\n\n' +
+      'The provided executor cannot isolate Config A (no guidance) from Config B (with guidance).\n' +
+      'Without content isolation, both configs will read the same on-disk CLAUDE.md, producing\n' +
+      'a guaranteed zero-delta result.\n\n' +
+      'Why this happens:\n' +
+      '  • The default executor runs `claude -p` which loads CLAUDE.md from the repository root\n' +
+      '  • File swapping in a working directory does not affect what `claude -p` reads\n' +
+      '  • The benchmark would spend ~$23 and 21 minutes to produce meaningless results\n\n' +
+      'To fix this:\n' +
+      '  1. Provide a custom executor that implements IContentAwareExecutor\n' +
+      '  2. Your executor must inject guidance via system prompts (not file swapping)\n' +
+      '  3. Example: Use --append-system-prompt flag or API-based context injection\n\n' +
+      'Note: This is a known limitation tracked in issue #1652.\n' +
+      'A proper content-aware executor implementation is needed to make A/B testing meaningful.'
+    );
+  }
 
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)

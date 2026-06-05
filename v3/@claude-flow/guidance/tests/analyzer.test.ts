@@ -2118,6 +2118,58 @@ describe('abBenchmark', () => {
     });
   });
 
+  describe('non-content-aware executor detection', () => {
+    // Mock non-content-aware executor (like the default)
+    class NonContentAwareExecutor implements IHeadlessExecutor {
+      async execute(_prompt: string, _workDir: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+        return { stdout: 'some output', stderr: '', exitCode: 0 };
+      }
+    }
+
+    it('throws error when using non-content-aware executor', async () => {
+      const executor = new NonContentAwareExecutor();
+      
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor });
+      }).rejects.toThrow(/content-aware executor/i);
+    });
+
+    it('error message explains the zero-delta problem', async () => {
+      const executor = new NonContentAwareExecutor();
+      
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.message).toContain('zero-delta');
+        expect(error.message).toContain('Config A');
+        expect(error.message).toContain('Config B');
+      }
+    });
+
+    it('error message mentions issue #1652', async () => {
+      const executor = new NonContentAwareExecutor();
+      
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.message).toContain('#1652');
+      }
+    });
+
+    it('error message suggests using IContentAwareExecutor', async () => {
+      const executor = new NonContentAwareExecutor();
+      
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.message).toContain('IContentAwareExecutor');
+      }
+    });
+  });
+
   describe('A/B execution with differential executor', () => {
     it('returns a complete ABReport', async () => {
       const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
