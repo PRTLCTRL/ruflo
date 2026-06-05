@@ -31,8 +31,7 @@
       "Bash(ls:*)",
       "Bash(npx:*)",
       "mcp__claude-flow__*",
-      "mcp__ruv-swarm__*",
-      "mcp__flow-nexus__*"
+      "mcp__ruv-swarm__*"
     ],
     "deny": [
       "Read(./.env)",
