@@ -2118,6 +2118,53 @@ describe('abBenchmark', () => {
     });
   });
 
+  describe('content-aware executor validation', () => {
+    it('throws error when non-content-aware executor is provided', async () => {
+      // Create a non-content-aware executor (missing setContext method)
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(_prompt: string, _workDir: string) {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        },
+      };
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor: nonContentAwareExecutor })
+      ).rejects.toThrow('abBenchmark requires a content-aware executor');
+    });
+
+    it('error message explains the zero-delta problem', async () => {
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(_prompt: string, _workDir: string) {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        },
+      };
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor: nonContentAwareExecutor })
+      ).rejects.toThrow('producing a guaranteed zero-delta');
+    });
+
+    it('error message suggests fixes', async () => {
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(_prompt: string, _workDir: string) {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        },
+      };
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor: nonContentAwareExecutor })
+      ).rejects.toThrow('Use the default executor');
+    });
+
+    it('accepts content-aware executor (default)', async () => {
+      // Should not throw - DefaultHeadlessExecutor is content-aware
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD);
+      expect(report).toBeDefined();
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+  });
+
   describe('A/B execution with differential executor', () => {
     it('returns a complete ABReport', async () => {
       const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
