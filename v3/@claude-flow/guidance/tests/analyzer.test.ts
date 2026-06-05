@@ -2118,6 +2118,42 @@ describe('abBenchmark', () => {
     });
   });
 
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'mock output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/requires a content-aware executor/);
+    });
+
+    it('includes helpful fix suggestions in error message', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'mock output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/IContentAwareExecutor/);
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/setContext method/);
+    });
+  });
+
   describe('A/B execution with differential executor', () => {
     it('returns a complete ABReport', async () => {
       const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {

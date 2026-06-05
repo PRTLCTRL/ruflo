@@ -3131,9 +3131,26 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // ── Defensive check: require content-aware executor ─────────────────
+  // Without content isolation, both Config A and Config B read the same on-disk CLAUDE.md,
+  // producing an architecturally guaranteed zero-delta. Abort before wasting tokens (~$23/run).
+  if (!contentAware) {
+    throw new Error(
+      'ruflo guidance ab-test requires a content-aware executor to isolate Config A (no guidance) ' +
+      'from Config B (with CLAUDE.md guidance). The provided executor does not implement ' +
+      'IContentAwareExecutor (missing setContext method).\n\n' +
+      'Without content isolation, both configs will read the same on-disk CLAUDE.md, ' +
+      'producing a guaranteed zero-delta and wasting ~$23 in API costs per benchmark run.\n\n' +
+      'To fix this:\n' +
+      '1. Use the default executor (already content-aware in v3.0.0-alpha.2+)\n' +
+      '2. Implement IContentAwareExecutor with a setContext(claudeMdContent: string) method\n' +
+      '3. See DefaultHeadlessExecutor implementation in analyzer.ts for reference'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
-  if (contentAware) executor.setContext('');
+  executor.setContext('');
   const configAResults = await runABConfig(executor, tasks, workDir);
   const configAMetrics = computeABMetrics(configAResults);
 
@@ -3142,7 +3159,7 @@ export async function abBenchmark(
   // Retriever injection: the executor gets full guidance context
   // Persisted ledger: gate simulation logs violations
   // Deterministic tool gateway: assertions enforce compliance
-  if (contentAware) executor.setContext(claudeMdContent);
+  executor.setContext(claudeMdContent);
   const configBResults = await runABConfig(executor, tasks, workDir);
   const configBMetrics = computeABMetrics(configBResults);
 
