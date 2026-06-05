@@ -103,8 +103,8 @@ export async function copyAgentFiles(targetDir, options = {}) {
     
     if (!dryRun && copiedFiles.length > 0) {
       console.log(`  ✅ Copied ${copiedFiles.length} agent files`);
-      console.log('  📋 Agent system initialized with 64 specialized agents');
-      console.log('  🎯 Available categories: Core, Swarm, Consensus, Performance, GitHub, SPARC, Testing');
+      console.log('  📋 Agent system initialized with ~83 functional agents');
+      console.log('  🎯 Available categories: Core, Swarm, Consensus, Performance, GitHub, SPARC, Testing, V3');
     } else if (dryRun) {
       console.log(`  [DRY RUN] Would copy ${copiedFiles.length} agent files`);
     }
@@ -164,9 +164,7 @@ export async function createAgentDirectories(targetDir, dryRun = false) {
     '.claude/agents/documentation/api-docs',
     '.claude/agents/specialized',
     '.claude/agents/specialized/mobile',
-    '.claude/agents/flow-nexus',
-    '.claude/commands',
-    '.claude/commands/flow-nexus'
+    '.claude/commands'
   ];
   
   if (dryRun) {
@@ -331,7 +329,7 @@ export async function validateAgentSystem(targetDir) {
     console.log(`    • Categories: ${agentCategories.join(', ')}`);
     
     return {
-      valid: totalAgents > 50, // Should have at least 50+ agents
+      valid: totalAgents > 70, // Should have at least 70+ agents
       categories: agentCategories.length,
       totalAgents,
       categoryNames: agentCategories
