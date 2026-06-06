@@ -10,6 +10,7 @@ import {
   getDefaultABTasks,
   formatReport,
   formatBenchmark,
+  DefaultHeadlessExecutor,
 } from '../src/analyzer.js';
 import type {
   AnalysisResult,
@@ -2115,6 +2116,77 @@ describe('abBenchmark', () => {
       expect(counts['deployment']).toBe(2);
       expect(counts['test']).toBe(2);
       expect(counts['performance']).toBe(2);
+    });
+  });
+
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(async () => {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        });
+      }).rejects.toThrow(/Cannot run A\/B benchmark with non-content-aware executor/);
+    });
+
+    it('error message includes cost estimate', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        });
+        throw new Error('Should have thrown');
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain('$23.20');
+        expect(message).toContain('40 calls');
+      }
+    });
+
+    it('error message includes solutions', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        });
+        throw new Error('Should have thrown');
+      } catch (error) {
+        const message = (error as Error).message;
+        expect(message).toContain('DefaultHeadlessExecutor');
+        expect(message).toContain('IContentAwareExecutor');
+        expect(message).toContain('issues/1652');
+      }
+    });
+
+    it('accepts DefaultHeadlessExecutor (content-aware)', async () => {
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: new DefaultHeadlessExecutor(),
+      });
+      expect(report).toBeDefined();
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+
+    it('accepts custom content-aware executors', async () => {
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: new ABDifferentialExecutor(),
+      });
+      expect(report).toBeDefined();
     });
   });
 
