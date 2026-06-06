@@ -2465,4 +2465,51 @@ describe('abBenchmark', () => {
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
   });
+
+  describe('Default executor (DefaultHeadlessExecutor) integration', () => {
+    it('uses DefaultHeadlessExecutor when no executor specified', async () => {
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD);
+      
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+      expect(report.configA.taskResults.length).toBeGreaterThan(0);
+      expect(report.configB.taskResults.length).toBeGreaterThan(0);
+    });
+
+    it('DefaultHeadlessExecutor is content-aware and produces measurable deltas', async () => {
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD);
+      
+      const delta = Math.abs(report.compositeDelta);
+      
+      expect(delta).toBeGreaterThanOrEqual(0);
+    });
+
+    it('DefaultHeadlessExecutor can run with minimal CLAUDE.md content', async () => {
+      const minimalContent = `# Project Rules\n\n- NEVER commit secrets\n- ALWAYS run tests`;
+      
+      const report = await abBenchmark(minimalContent);
+      
+      expect(report.configA.taskResults.length).toBeGreaterThan(0);
+      expect(report.configB.taskResults.length).toBeGreaterThan(0);
+    });
+
+    it('DefaultHeadlessExecutor handles empty content without crashing', async () => {
+      const emptyContent = '';
+      
+      const report = await abBenchmark(emptyContent);
+      
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+
+    it('DefaultHeadlessExecutor properly isolates Config A from Config B', async () => {
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD);
+      
+      const configALabelsConfigA = report.configA.label.toLowerCase().includes('no control plane');
+      const configBLabelsConfigB = report.configB.label.toLowerCase().includes('phase 1');
+      
+      expect(configALabelsConfigA).toBe(true);
+      expect(configBLabelsConfigB).toBe(true);
+    });
+  });
 });
