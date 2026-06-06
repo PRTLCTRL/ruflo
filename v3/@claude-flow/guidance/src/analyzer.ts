@@ -3131,6 +3131,18 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // Early abort if executor cannot isolate configs
+  if (!contentAware) {
+    throw new Error(
+      'A/B benchmark requires a content-aware executor. ' +
+      'The provided executor does not implement IContentAwareExecutor.setContext(), ' +
+      'so Config A and Config B will both read the same on-disk CLAUDE.md, ' +
+      'guaranteeing a zero-delta result and wasting token spend (~$23 for default suite). ' +
+      'Either provide a custom executor with setContext() support, or ensure your ' +
+      'DefaultHeadlessExecutor implements IContentAwareExecutor properly.'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');
