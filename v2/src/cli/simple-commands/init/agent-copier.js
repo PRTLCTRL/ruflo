@@ -146,26 +146,15 @@ export async function createAgentDirectories(targetDir, dryRun = false) {
     '.claude/agents/github',
     '.claude/agents/sparc',
     '.claude/agents/testing',
-    '.claude/agents/testing/unit',
-    '.claude/agents/testing/validation',
     '.claude/agents/templates',
     '.claude/agents/analysis',
-    '.claude/agents/analysis/code-review',
     '.claude/agents/architecture',
-    '.claude/agents/architecture/system-design',
     '.claude/agents/data',
-    '.claude/agents/data/ml',
     '.claude/agents/development',
-    '.claude/agents/development/backend',
     '.claude/agents/devops',
-    '.claude/agents/devops/ci-cd',
     '.claude/agents/documentation',
-    '.claude/agents/documentation/api-docs',
     '.claude/agents/specialized',
-    '.claude/agents/specialized/mobile',
-    '.claude/agents/flow-nexus',
-    '.claude/commands',
-    '.claude/commands/flow-nexus'
+    '.claude/commands'
   ];
   
   if (dryRun) {
