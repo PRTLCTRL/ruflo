@@ -3131,9 +3131,23 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // Abort early if executor cannot isolate configs — prevents guaranteed zero-delta result
+  if (!contentAware) {
+    throw new Error(
+      'AB benchmark requires a content-aware executor that implements setContext(). ' +
+      'The provided executor cannot isolate Config A (baseline) from Config B (with guidance), ' +
+      'which means both configs will read the same on-disk CLAUDE.md and produce a guaranteed ' +
+      'zero-delta result. This would waste ~$23 and ~21 minutes for a meaningless benchmark. ' +
+      '\n\nTo fix this:\n' +
+      '1. Use the default executor (DefaultHeadlessExecutor) which supports content isolation, or\n' +
+      '2. Provide a custom executor that implements IContentAwareExecutor with setContext().\n' +
+      '\nSee issue #1652 for details.'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
-  if (contentAware) executor.setContext('');
+  executor.setContext('');
   const configAResults = await runABConfig(executor, tasks, workDir);
   const configAMetrics = computeABMetrics(configAResults);
 
@@ -3142,7 +3156,7 @@ export async function abBenchmark(
   // Retriever injection: the executor gets full guidance context
   // Persisted ledger: gate simulation logs violations
   // Deterministic tool gateway: assertions enforce compliance
-  if (contentAware) executor.setContext(claudeMdContent);
+  executor.setContext(claudeMdContent);
   const configBResults = await runABConfig(executor, tasks, workDir);
   const configBMetrics = computeABMetrics(configBResults);
 

@@ -2075,6 +2075,45 @@ class ABDifferentialExecutor implements IContentAwareExecutor {
 }
 
 describe('abBenchmark', () => {
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware (issue #1652)', async () => {
+      // Non-content-aware executor (missing setContext method)
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'test output', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        }),
+      ).rejects.toThrow(/AB benchmark requires a content-aware executor/);
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        }),
+      ).rejects.toThrow(/setContext\(\)/);
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        }),
+      ).rejects.toThrow(/issue #1652/);
+    });
+
+    it('does not throw when using default content-aware executor', async () => {
+      // This should NOT throw - the default executor is content-aware
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: new ABDifferentialExecutor(),
+      });
+      expect(report).toBeDefined();
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+  });
+
   describe('task inventory', () => {
     it('provides 20 default tasks', () => {
       const tasks = getDefaultABTasks();
