@@ -474,6 +474,7 @@ const abTestCommand: Command = {
     { name: 'tasks', short: 't', type: 'string', description: 'Path to custom task JSON file (array of ABTask objects)' },
     { name: 'work-dir', short: 'w', type: 'string', description: 'Working directory for test execution' },
     { name: 'json', type: 'boolean', description: 'Output as JSON', default: 'false' },
+    { name: 'allow-default-executor', type: 'boolean', description: 'Skip default executor warning (not recommended - may produce zero-delta results)', default: 'false' },
   ],
   examples: [
     { command: 'claude-flow guidance ab-test', description: 'Run default A/B test (no guidance vs ./CLAUDE.md)' },
@@ -487,6 +488,7 @@ const abTestCommand: Command = {
     const tasksPath = ctx.flags.tasks as string | undefined;
     const workDir = ctx.flags['work-dir'] as string | undefined;
     const jsonOutput = ctx.flags.json === true;
+    const allowDefaultExecutor = ctx.flags['allow-default-executor'] === true;
 
     output.writeln();
     output.writeln(output.bold('A/B Behavioral Benchmark'));
@@ -536,6 +538,7 @@ const abTestCommand: Command = {
       const report = await abBenchmark(configBContent, {
         tasks: customTasks,
         workDir,
+        skipDefaultExecutorWarning: allowDefaultExecutor,
       });
 
       if (jsonOutput) {
