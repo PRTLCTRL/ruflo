@@ -2075,6 +2075,50 @@ class ABDifferentialExecutor implements IContentAwareExecutor {
 }
 
 describe('abBenchmark', () => {
+  describe('content-aware executor guard', () => {
+    it('throws error when non-content-aware executor is provided', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow('abBenchmark requires a content-aware executor');
+    });
+
+    it('accepts content-aware executor without error', async () => {
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new ABDifferentialExecutor(),
+        })
+      ).resolves.toBeDefined();
+    });
+
+    it('default executor is content-aware', async () => {
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD)
+      ).resolves.toBeDefined();
+    });
+
+    it('error message includes helpful guidance', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(prompt: string): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: '{}', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow('DefaultHeadlessExecutor');
+    });
+  });
+
   describe('task inventory', () => {
     it('provides 20 default tasks', () => {
       const tasks = getDefaultABTasks();
