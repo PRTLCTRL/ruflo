@@ -2465,4 +2465,51 @@ describe('abBenchmark', () => {
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
   });
+
+  describe('executor validation', () => {
+    it('throws error when non-content-aware executor is provided', async () => {
+      // Create a basic executor without setContext
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'test', stderr: '', exitCode: 0 };
+        }
+      }
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        })
+      ).rejects.toThrow(/content-aware executor/i);
+    });
+
+    it('provides helpful error message explaining the problem', async () => {
+      class NonContentAwareExecutor implements IHeadlessExecutor {
+        async execute(): Promise<{ stdout: string; stderr: string; exitCode: number }> {
+          return { stdout: 'test', stderr: '', exitCode: 0 };
+        }
+      }
+
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: new NonContentAwareExecutor(),
+        });
+        expect.fail('Should have thrown an error');
+      } catch (error: any) {
+        expect(error.message).toContain('IContentAwareExecutor');
+        expect(error.message).toContain('setContext');
+        expect(error.message).toContain('zero-delta');
+        expect(error.message).toContain('Solution');
+      }
+    });
+
+    it('succeeds with content-aware executor (ABDifferentialExecutor)', async () => {
+      // This should not throw - ABDifferentialExecutor is content-aware
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: new ABDifferentialExecutor(),
+      });
+      expect(report).toBeDefined();
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+  });
 });

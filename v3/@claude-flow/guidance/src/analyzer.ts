@@ -3131,6 +3131,33 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // Validate that the executor can actually isolate Config A from Config B
+  if (!contentAware) {
+    throw new Error(
+      `A/B benchmark requires a content-aware executor to isolate configs.\n` +
+      `\n` +
+      `Problem: The provided executor does not implement IContentAwareExecutor (missing setContext method).\n` +
+      `This means both Config A and Config B will read the same on-disk CLAUDE.md file, ` +
+      `guaranteeing a zero-delta result regardless of your guidance content.\n` +
+      `\n` +
+      `Cost impact: The default 20-task suite costs ~$23 and takes ~21 minutes. ` +
+      `Running it with a non-content-aware executor wastes both.\n` +
+      `\n` +
+      `Solution:\n` +
+      `  1. Use the default executor (don't pass executor option), OR\n` +
+      `  2. Provide a custom executor that implements IContentAwareExecutor with a setContext(content: string) method\n` +
+      `\n` +
+      `Example content-aware executor:\n` +
+      `  class MyExecutor implements IContentAwareExecutor {\n` +
+      `    private context: string = '';\n` +
+      `    setContext(content: string): void { this.context = content; }\n` +
+      `    async execute(prompt: string, workDir: string): Promise<{stdout, stderr, exitCode}> {\n` +
+      `      // Your implementation that uses this.context\n` +
+      `    }\n` +
+      `  }`
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');
