@@ -3131,6 +3131,18 @@ export async function abBenchmark(
 
   const contentAware = isContentAwareExecutor(executor);
 
+  // ── Guard: Reject non-content-aware executors ──────────────────────
+  // Without setContext(), Config A and Config B both read on-disk CLAUDE.md
+  // and produce a guaranteed zero-delta, wasting ~$23 and 21 minutes.
+  if (!contentAware) {
+    throw new Error(
+      'abBenchmark requires a content-aware executor. The provided IHeadlessExecutor lacks `setContext()`, ' +
+      'so Config A and Config B will both read the same on-disk CLAUDE.md and the delta is guaranteed to be zero. ' +
+      'Either use the DefaultHeadlessExecutor (content-aware as of @claude-flow/guidance@3.0.0-alpha.2) ' +
+      'or implement IContentAwareExecutor on your custom executor.'
+    );
+  }
+
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
   if (contentAware) executor.setContext('');

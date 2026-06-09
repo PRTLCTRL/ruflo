@@ -2075,6 +2075,31 @@ class ABDifferentialExecutor implements IContentAwareExecutor {
 }
 
 describe('abBenchmark', () => {
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      // CompliantExecutor implements IHeadlessExecutor but NOT IContentAwareExecutor
+      const nonContentAwareExecutor = new CompliantExecutor();
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor: nonContentAwareExecutor })
+      ).rejects.toThrow(/requires a content-aware executor/);
+    });
+
+    it('accepts content-aware executor without throwing', async () => {
+      // ABDifferentialExecutor implements IContentAwareExecutor
+      const contentAwareExecutor = new ABDifferentialExecutor();
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, { executor: contentAwareExecutor })
+      ).resolves.toBeDefined();
+    });
+
+    it('default executor (DefaultHeadlessExecutor) is content-aware', async () => {
+      // DefaultHeadlessExecutor should be content-aware
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD)
+      ).resolves.toBeDefined();
+    });
+  });
+
   describe('task inventory', () => {
     it('provides 20 default tasks', () => {
       const tasks = getDefaultABTasks();
