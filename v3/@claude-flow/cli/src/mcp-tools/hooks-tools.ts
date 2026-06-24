@@ -192,6 +192,25 @@ function extractKeywords(text: string): string[] {
     .filter(w => w.length > 2 && !ROUTING_STOPWORDS.has(w));
 }
 
+/**
+ * Parse period string (e.g. "24h", "7d", "30d") into milliseconds
+ */
+function parsePeriod(period: string): number {
+  const match = period.match(/^(\d+)([hdwm])$/);
+  if (!match) return 24 * 60 * 60 * 1000; // default 24 hours
+  
+  const value = parseInt(match[1], 10);
+  const unit = match[2];
+  
+  switch (unit) {
+    case 'h': return value * 60 * 60 * 1000; // hours
+    case 'd': return value * 24 * 60 * 60 * 1000; // days
+    case 'w': return value * 7 * 24 * 60 * 60 * 1000; // weeks
+    case 'm': return value * 30 * 24 * 60 * 60 * 1000; // months (approx)
+    default: return 24 * 60 * 60 * 1000;
+  }
+}
+
 function loadRoutingOutcomes(): RoutingOutcome[] {
   try {
     if (existsSync(ROUTING_OUTCOMES_PATH)) {
@@ -1070,17 +1089,91 @@ export const hooksMetrics: MCPTool = {
   },
   handler: async (params: Record<string, unknown>) => {
     const period = (params.period as string) || '24h';
+    const periodMs = parsePeriod(period);
+    const cutoffTime = Date.now() - periodMs;
 
-    // Try to read real counts from memory store
-    const store = loadMemoryStore();
-    const entries = Object.values(store.entries);
+    // Read from actual data sources that hooks_post-task writes to
+    let taskOutcomes: Array<{ success: boolean; quality?: number; agent?: string; timestamp?: string; type?: string; metadata?: {success?: boolean; quality?: number; agent?: string} }> = [];
+    let routingOutcomes: RoutingOutcome[] = [];
+    let totalPatterns = 0;
+    let successfulPatterns = 0;
+    let failedPatterns = 0;
+    let qualitySum = 0;
+    let qualityCount = 0;
 
-    // Count patterns by looking at stored pattern entries
-    const patternEntries = entries.filter(e => e.key.includes('pattern'));
-    const routingEntries = entries.filter(e => e.key.includes('route') || e.key.includes('routing'));
-    const taskEntries = entries.filter(e => e.key.includes('task'));
+    // 1. Read from .claude-flow/data/auto-memory-store.json (written by post-task)
+    try {
+      const dataDir = join(getProjectCwd(), '.claude-flow', 'data');
+      const storePath = join(dataDir, 'auto-memory-store.json');
+      if (existsSync(storePath)) {
+        const storeData = JSON.parse(readFileSync(storePath, 'utf-8'));
+        if (Array.isArray(storeData)) {
+          taskOutcomes = storeData.filter((entry: any) => {
+            const timestamp = entry.createdAt || Date.now();
+            return timestamp >= cutoffTime && (entry.type === 'task-outcome' || entry.namespace === 'tasks');
+          });
+        }
+      }
+    } catch {
+      // Non-fatal: continue with empty array
+    }
 
-    if (entries.length === 0) {
+    // 2. Read from .claude-flow/routing-outcomes.json (written by post-task for routing decisions)
+    try {
+      if (existsSync(ROUTING_OUTCOMES_PATH)) {
+        const outcomesData = JSON.parse(readFileSync(ROUTING_OUTCOMES_PATH, 'utf-8'));
+        if (outcomesData && Array.isArray(outcomesData.outcomes)) {
+          routingOutcomes = outcomesData.outcomes.filter((o: RoutingOutcome) => {
+            const outcomeTime = new Date(o.timestamp).getTime();
+            return outcomeTime >= cutoffTime;
+          });
+        }
+      }
+    } catch {
+      // Non-fatal
+    }
+
+    // 3. Fallback: try legacy memory store (for backwards compat)
+    if (taskOutcomes.length === 0 && routingOutcomes.length === 0) {
+      try {
+        const store = loadMemoryStore();
+        const entries = Object.values(store.entries);
+        const patternEntries = entries.filter(e => e.key.includes('pattern'));
+        const routingEntries = entries.filter(e => e.key.includes('route') || e.key.includes('routing'));
+        const taskEntries = entries.filter(e => e.key.includes('task'));
+
+        if (entries.length > 0) {
+          // Use legacy data source as fallback
+          return {
+            period,
+            patterns: {
+              total: patternEntries.length,
+              successful: null,
+              failed: null,
+              avgConfidence: null,
+            },
+            agents: {
+              routingAccuracy: null,
+              totalRoutes: routingEntries.length,
+              topAgent: null,
+            },
+            commands: {
+              totalExecuted: taskEntries.length,
+              successRate: null,
+              avgRiskScore: null,
+            },
+            dataSource: 'memory-store-legacy',
+            entriesFound: entries.length,
+            lastUpdated: new Date().toISOString(),
+          };
+        }
+      } catch {
+        // Ignore errors
+      }
+    }
+
+    // Calculate metrics from collected data
+    if (taskOutcomes.length === 0 && routingOutcomes.length === 0) {
       return {
         _real: true,
         _note: 'No metrics data collected yet. Data populates from hooks_post-task, hooks_post-edit, hooks_post-command, and hooks_route calls.',
@@ -1092,26 +1185,83 @@ export const hooksMetrics: MCPTool = {
       };
     }
 
+    // Process task outcomes
+    for (const outcome of taskOutcomes) {
+      totalPatterns++;
+      const success = outcome.success ?? outcome.metadata?.success ?? false;
+      const quality = outcome.quality ?? outcome.metadata?.quality;
+      if (success) {
+        successfulPatterns++;
+      } else {
+        failedPatterns++;
+      }
+      if (quality != null && !isNaN(quality)) {
+        qualitySum += quality;
+        qualityCount++;
+      }
+    }
+
+    // Process routing outcomes
+    const agentCounts: Record<string, { total: number; successful: number }> = {};
+    for (const outcome of routingOutcomes) {
+      const agent = outcome.agent || 'unknown';
+      if (!agentCounts[agent]) {
+        agentCounts[agent] = { total: 0, successful: 0 };
+      }
+      agentCounts[agent].total++;
+      if (outcome.success) {
+        agentCounts[agent].successful++;
+      }
+    }
+
+    // Find top agent
+    let topAgent: string | null = null;
+    let topAgentSuccessRate = 0;
+    for (const [agent, counts] of Object.entries(agentCounts)) {
+      const successRate = counts.total > 0 ? counts.successful / counts.total : 0;
+      if (successRate > topAgentSuccessRate || (successRate === topAgentSuccessRate && counts.total > (agentCounts[topAgent!]?.total || 0))) {
+        topAgent = agent;
+        topAgentSuccessRate = successRate;
+      }
+    }
+
+    // Calculate overall routing accuracy
+    const totalRoutingDecisions = routingOutcomes.length;
+    const successfulRoutingDecisions = routingOutcomes.filter(o => o.success).length;
+    const routingAccuracy = totalRoutingDecisions > 0 ? successfulRoutingDecisions / totalRoutingDecisions : null;
+
+    // Calculate avg confidence (from quality scores)
+    const avgConfidence = qualityCount > 0 ? qualitySum / qualityCount : null;
+
+    // Calculate command success rate
+    const totalCommands = taskOutcomes.length;
+    const successfulCommands = taskOutcomes.filter(o => o.success ?? o.metadata?.success ?? false).length;
+    const commandSuccessRate = totalCommands > 0 ? successfulCommands / totalCommands : null;
+
+    // Calculate avg risk score (placeholder - would need actual risk data)
+    const avgRiskScore = null;
+
     return {
       period,
       patterns: {
-        total: patternEntries.length,
-        successful: null,
-        failed: null,
-        avgConfidence: null,
+        total: totalPatterns,
+        successful: successfulPatterns,
+        failed: failedPatterns,
+        avgConfidence,
       },
       agents: {
-        routingAccuracy: null,
-        totalRoutes: routingEntries.length,
-        topAgent: null,
+        routingAccuracy,
+        totalRoutes: totalRoutingDecisions,
+        topAgent,
       },
       commands: {
-        totalExecuted: taskEntries.length,
-        successRate: null,
-        avgRiskScore: null,
+        totalExecuted: totalCommands,
+        successRate: commandSuccessRate,
+        avgRiskScore,
       },
-      dataSource: 'memory-store',
-      entriesFound: entries.length,
+      dataSource: 'auto-memory-store + routing-outcomes',
+      taskOutcomesFound: taskOutcomes.length,
+      routingOutcomesFound: routingOutcomes.length,
       lastUpdated: new Date().toISOString(),
     };
   },

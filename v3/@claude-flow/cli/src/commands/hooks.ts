@@ -1346,10 +1346,10 @@ const metricsCommand: Command = {
           { key: 'value', header: 'Value', width: 20, align: 'right' }
         ],
         data: [
-          { metric: 'Total Patterns', value: result.patterns.total },
-          { metric: 'Successful', value: output.success(String(result.patterns.successful)) },
-          { metric: 'Failed', value: output.error(String(result.patterns.failed)) },
-          { metric: 'Avg Confidence', value: `${(result.patterns.avgConfidence * 100).toFixed(1)}%` }
+          { metric: 'Total Patterns', value: result.patterns.total || 0 },
+          { metric: 'Successful', value: output.success(String(result.patterns.successful || 0)) },
+          { metric: 'Failed', value: output.error(String(result.patterns.failed || 0)) },
+          { metric: 'Avg Confidence', value: result.patterns.avgConfidence != null ? `${(result.patterns.avgConfidence * 100).toFixed(1)}%` : 'N/A' }
         ]
       });
 
@@ -1363,9 +1363,9 @@ const metricsCommand: Command = {
           { key: 'value', header: 'Value', width: 20, align: 'right' }
         ],
         data: [
-          { metric: 'Routing Accuracy', value: `${(result.agents.routingAccuracy * 100).toFixed(1)}%` },
-          { metric: 'Total Routes', value: result.agents.totalRoutes },
-          { metric: 'Top Agent', value: output.highlight(result.agents.topAgent) }
+          { metric: 'Routing Accuracy', value: result.agents.routingAccuracy != null ? `${(result.agents.routingAccuracy * 100).toFixed(1)}%` : 'N/A' },
+          { metric: 'Total Routes', value: result.agents.totalRoutes || 0 },
+          { metric: 'Top Agent', value: result.agents.topAgent ? output.highlight(result.agents.topAgent) : 'N/A' }
         ]
       });
 
@@ -1379,9 +1379,9 @@ const metricsCommand: Command = {
           { key: 'value', header: 'Value', width: 20, align: 'right' }
         ],
         data: [
-          { metric: 'Total Executed', value: result.commands.totalExecuted },
-          { metric: 'Success Rate', value: `${(result.commands.successRate * 100).toFixed(1)}%` },
-          { metric: 'Avg Risk Score', value: result.commands.avgRiskScore.toFixed(2) }
+          { metric: 'Total Executed', value: result.commands.totalExecuted || 0 },
+          { metric: 'Success Rate', value: result.commands.successRate != null ? `${(result.commands.successRate * 100).toFixed(1)}%` : 'N/A' },
+          { metric: 'Avg Risk Score', value: result.commands.avgRiskScore != null ? result.commands.avgRiskScore.toFixed(2) : 'N/A' }
         ]
       });
 
