@@ -3120,6 +3120,7 @@ export async function abBenchmark(
     tasks?: ABTask[];
     proofKey?: string;
     workDir?: string;
+    skipDefaultExecutorWarning?: boolean;
   } = {},
 ): Promise<ABReport> {
   const {
@@ -3127,9 +3128,30 @@ export async function abBenchmark(
     tasks = getABTasks(),
     proofKey,
     workDir = process.cwd(),
+    skipDefaultExecutorWarning = false,
   } = options;
 
   const contentAware = isContentAwareExecutor(executor);
+
+  // ── Validate executor can perform meaningful comparison ──────────────
+  // DefaultHeadlessExecutor swaps CLAUDE.md on disk, but Claude CLI may cache
+  // or read the file before the swap, leading to zero-delta benchmarks.
+  // Warn users to avoid wasting tokens (~$23 for default 20-task suite).
+  if (!skipDefaultExecutorWarning && executor.constructor.name === 'DefaultHeadlessExecutor') {
+    const estimatedCost = (tasks.length * 2 * 0.58).toFixed(2);
+    throw new Error(
+      `ab-test with default executor may produce zero-delta results.\n\n` +
+      `DefaultHeadlessExecutor swaps CLAUDE.md on disk, but Claude CLI may cache ` +
+      `the file before the swap occurs, causing both Config A and Config B to read ` +
+      `identical guidance. This produces misleading zero-delta results while ` +
+      `consuming ~$${estimatedCost} in API costs (${tasks.length * 2} tasks × $0.58 each).\n\n` +
+      `Solutions:\n` +
+      `1. Provide a custom IContentAwareExecutor that injects context via --append-system-prompt\n` +
+      `2. Use a mock executor for testing (see analyzer.test.ts for examples)\n` +
+      `3. Pass skipDefaultExecutorWarning: true if you explicitly accept the risk\n\n` +
+      `See https://github.com/ruvnet/ruflo/issues/1652 for details.`
+    );
+  }
 
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
