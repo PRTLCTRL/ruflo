@@ -3097,6 +3097,11 @@ function pad(value: number): string {
  * **Config B** (treatment): With guidance — executor gets setContext(claudeMd) +
  *   gate simulation on every output
  *
+ * **IMPORTANT**: This function requires a content-aware executor (IContentAwareExecutor)
+ * that implements `setContext(content: string)`. Without this, both configs would read
+ * the same on-disk CLAUDE.md, producing a guaranteed zero-delta result. The default
+ * DefaultHeadlessExecutor implements this correctly.
+ *
  * The 20 tasks span 7 task classes drawn from real Claude Flow repo history:
  * bug-fix (3), feature (5), refactor (3), security (3), deployment (2),
  * test (2), performance (2).
@@ -3110,8 +3115,9 @@ function pad(value: number): string {
  * = "category shift"
  *
  * @param claudeMdContent - The CLAUDE.md content used for Config B
- * @param options - Executor, tasks, proof key, work directory
+ * @param options - Executor (must implement IContentAwareExecutor), tasks, proof key, work directory
  * @returns ABReport with full per-task and per-class breakdown
+ * @throws Error if executor is not content-aware (missing setContext method)
  */
 export async function abBenchmark(
   claudeMdContent: string,
@@ -3130,6 +3136,27 @@ export async function abBenchmark(
   } = options;
 
   const contentAware = isContentAwareExecutor(executor);
+
+  // ── Validation: Ensure executor can isolate configs ────────────────────
+  if (!contentAware) {
+    throw new Error(
+      'A/B benchmark requires a content-aware executor (IContentAwareExecutor).\n' +
+      '\n' +
+      'The provided executor cannot isolate Config A (no guidance) from Config B (with guidance),\n' +
+      'which guarantees a zero-delta result and wastes ~$23 in API calls per benchmark run.\n' +
+      '\n' +
+      'DefaultHeadlessExecutor implements this interface correctly, so if you are seeing this error,\n' +
+      'it likely means:\n' +
+      '  1. You provided a custom executor without setContext() support\n' +
+      '  2. The package needs rebuilding (run: npm run build in @claude-flow/guidance)\n' +
+      '  3. You are using an outdated published version (upgrade to latest)\n' +
+      '\n' +
+      'To fix:\n' +
+      '  - Use the default executor (omit the executor option)\n' +
+      '  - Implement IContentAwareExecutor with a setContext(content: string) method\n' +
+      '  - Upgrade: npm install -g ruflo@latest\n'
+    );
+  }
 
   // ── Config A: No control plane ──────────────────────────────────────
   // For content-aware executors, set empty context (simulating no guidance)
