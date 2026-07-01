@@ -2465,4 +2465,70 @@ describe('abBenchmark', () => {
       expect(report.configA.taskResults[0].taskId).toBe('custom-test-1');
     });
   });
+
+  describe('executor validation', () => {
+    it('throws error when executor is not content-aware', async () => {
+      // Create a mock executor that doesn't implement IContentAwareExecutor
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(_prompt: string, _workDir: string) {
+          return { stdout: 'result', stderr: '', exitCode: 0 };
+        },
+      };
+
+      await expect(
+        abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+          tasks: [getDefaultABTasks()[0]], // Just use first task for speed
+        })
+      ).rejects.toThrow('AB benchmark requires a content-aware executor');
+    });
+
+    it('error message explains the issue and provides fixes', async () => {
+      const nonContentAwareExecutor: IHeadlessExecutor = {
+        async execute(_prompt: string, _workDir: string) {
+          return { stdout: 'result', stderr: '', exitCode: 0 };
+        },
+      };
+
+      try {
+        await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+          executor: nonContentAwareExecutor,
+          tasks: [getDefaultABTasks()[0]],
+        });
+        throw new Error('Expected abBenchmark to throw');
+      } catch (error: any) {
+        expect(error.message).toContain('cannot isolate Config A');
+        expect(error.message).toContain('guarantees a zero-delta');
+        expect(error.message).toContain('~$23');
+        expect(error.message).toContain('setContext()');
+        expect(error.message).toContain('npm run build');
+        expect(error.message).toContain('npm install -g ruflo@latest');
+      }
+    });
+
+    it('allows default executor (which is content-aware)', async () => {
+      // DefaultHeadlessExecutor implements IContentAwareExecutor, so validation should pass
+      // We can't actually run the benchmark without claude CLI, but we can verify
+      // that a content-aware executor doesn't throw at the validation step
+      const contentAwareExecutor: IContentAwareExecutor = {
+        setContext(_content: string) {
+          // Mock setContext implementation
+        },
+        async execute(_prompt: string, _workDir: string) {
+          return { stdout: '{"result":"mock"}', stderr: '', exitCode: 0 };
+        },
+      };
+
+      // This should NOT throw during validation
+      const report = await abBenchmark(WELL_STRUCTURED_CLAUDE_MD, {
+        executor: contentAwareExecutor,
+        tasks: [getDefaultABTasks()[0]],
+      });
+
+      // If we got here, validation passed
+      expect(report).toBeDefined();
+      expect(report.configA).toBeDefined();
+      expect(report.configB).toBeDefined();
+    });
+  });
 });
