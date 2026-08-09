@@ -15,6 +15,8 @@
 
 import { z } from 'zod';
 import path from 'path';
+import fs from 'fs/promises';
+import fg from 'fast-glob';
 import type {
   SemanticSearchResult,
   ArchitectureAnalysisResult,
@@ -268,7 +270,10 @@ export const architectureAnalyzeTool: MCPTool<
         !isSensitivePath(f, context.config.blockedPatterns)
       );
 
-      const dependencyGraph = await gnn.buildCodeGraph(safeFiles, true);
+      let dependencyGraph = await gnn.buildCodeGraph(safeFiles, true);
+      
+      // Enrich graph with real import edges since GNN bridge extractImports is a stub
+      dependencyGraph = await enrichGraphWithEdges(dependencyGraph);
 
       // Perform requested analyses
       const result: ArchitectureAnalysisResult = {
@@ -644,30 +649,409 @@ export const learnPatternsTool: MCPTool<
 // Helper Functions
 // ============================================================================
 
-async function performSemanticSearch(
-  _query: string,
-  _paths: string[],
-  _searchType: string,
-  topK: number,
-  _languages: string[] | undefined,
-  _excludeTests: boolean,
-  _context: ToolContext
-): Promise<CodeSearchResult[]> {
-  // Simplified implementation
-  const results: CodeSearchResult[] = [];
-
-  // In production, would use vector index
-  return results.slice(0, topK);
+async function enrichGraphWithEdges(graph: DependencyGraph): Promise<DependencyGraph> {
+  const newEdges: DependencyEdge[] = [];
+  const nodeIds = new Set(graph.nodes.map(n => n.id));
+  
+  for (const node of graph.nodes) {
+    try {
+      const content = await fs.readFile(node.id, 'utf-8');
+      const imports = extractImportsFromContent(content, node.id);
+      
+      for (const importPath of imports) {
+        // Check if the imported file is in our graph
+        if (nodeIds.has(importPath)) {
+          // Avoid duplicate edges
+          const edgeExists = graph.edges.some(
+            e => e.from === node.id && e.to === importPath
+          );
+          
+          if (!edgeExists) {
+            newEdges.push({
+              from: node.id,
+              to: importPath,
+              weight: 1.0,
+              type: 'import',
+            });
+          }
+        }
+      }
+    } catch {
+      // Skip files that can't be read
+    }
+  }
+  
+  return {
+    ...graph,
+    edges: [...graph.edges, ...newEdges],
+  };
 }
 
-async function getFilesInPath(_rootPath: string): Promise<string[]> {
-  // Simplified - in production would use glob
-  return [];
+async function performSemanticSearch(
+  query: string,
+  paths: string[],
+  searchType: string,
+  topK: number,
+  languages: string[] | undefined,
+  excludeTests: boolean,
+  context: ToolContext
+): Promise<CodeSearchResult[]> {
+  // Get all relevant files
+  const files: string[] = [];
+  for (const rootPath of paths) {
+    const discovered = await getFilesInPath(rootPath);
+    files.push(...discovered);
+  }
+
+  // Filter by language if specified
+  let filteredFiles = files;
+  if (languages && languages.length > 0) {
+    const langExtensions = languages.map(lang => {
+      const extMap: Record<string, string[]> = {
+        typescript: ['.ts', '.tsx'],
+        javascript: ['.js', '.jsx', '.mjs'],
+        python: ['.py'],
+        java: ['.java'],
+        csharp: ['.cs'],
+        go: ['.go'],
+        rust: ['.rs'],
+        ruby: ['.rb'],
+        php: ['.php'],
+      };
+      return extMap[lang] || [];
+    }).flat();
+    
+    filteredFiles = files.filter(f => langExtensions.some(ext => f.endsWith(ext)));
+  }
+
+  // Exclude test files if requested
+  if (excludeTests) {
+    filteredFiles = filteredFiles.filter(f => 
+      !f.includes('.test.') && 
+      !f.includes('.spec.') &&
+      !f.includes('__tests__') &&
+      !f.includes('/tests/') &&
+      !f.includes('/test/')
+    );
+  }
+
+  // Read file contents and create embeddings
+  const documents: Array<{ path: string; content: string }> = [];
+  for (const filePath of filteredFiles.slice(0, 500)) {
+    try {
+      const content = await fs.readFile(filePath, 'utf-8');
+      documents.push({ path: filePath, content });
+    } catch {
+      // Skip files that can't be read
+    }
+  }
+
+  // Create query embedding
+  let queryEmbedding: number[] = [];
+  try {
+    // Try to use @claude-flow/embeddings if available
+    const { createEmbeddingService } = await import('@claude-flow/embeddings');
+    const embeddingService = createEmbeddingService({ provider: 'transformers' });
+    await embeddingService.initialize();
+    queryEmbedding = await embeddingService.embed(query);
+  } catch {
+    // Fallback to simple keyword matching if embeddings unavailable
+    queryEmbedding = simpleTextToVector(query);
+  }
+
+  // Calculate similarity scores
+  const results: Array<{ path: string; content: string; score: number }> = [];
+  for (const doc of documents) {
+    let docEmbedding: number[] = [];
+    try {
+      const { createEmbeddingService } = await import('@claude-flow/embeddings');
+      const embeddingService = createEmbeddingService({ provider: 'transformers' });
+      await embeddingService.initialize();
+      docEmbedding = await embeddingService.embed(doc.content.slice(0, 2000));
+    } catch {
+      docEmbedding = simpleTextToVector(doc.content.slice(0, 2000));
+    }
+
+    const score = cosineSimilarity(queryEmbedding, docEmbedding);
+    if (score > 0.1) {
+      results.push({ path: doc.path, content: doc.content, score });
+    }
+  }
+
+  // Sort by score and take topK
+  results.sort((a, b) => b.score - a.score);
+  const topResults = results.slice(0, topK);
+
+  // Extract relevant snippets
+  const codeResults: CodeSearchResult[] = topResults.map(r => {
+    const lines = r.content.split('\n');
+    const snippetLines = lines.slice(0, 10);
+    const snippet = snippetLines.join('\n');
+    const contextLines = lines.slice(10, 20);
+    const contextSnippet = contextLines.join('\n');
+
+    return {
+      filePath: r.path,
+      snippet,
+      context: contextSnippet,
+      similarity: r.score,
+      language: detectLanguage(r.path),
+      lineStart: 1,
+      lineEnd: Math.min(10, lines.length),
+    };
+  });
+
+  return codeResults;
+}
+
+function simpleTextToVector(text: string): number[] {
+  const words = text.toLowerCase().split(/\s+/);
+  const vector = new Array(384).fill(0);
+  
+  for (let i = 0; i < words.length && i < 384; i++) {
+    const word = words[i];
+    let hash = 0;
+    for (let j = 0; j < word.length; j++) {
+      hash = ((hash << 5) - hash) + word.charCodeAt(j);
+      hash = hash & hash;
+    }
+    vector[i % 384] = (hash % 100) / 100;
+  }
+  
+  return vector;
+}
+
+function cosineSimilarity(a: number[], b: number[]): number {
+  if (a.length !== b.length) return 0;
+  
+  let dotProduct = 0;
+  let normA = 0;
+  let normB = 0;
+  
+  for (let i = 0; i < a.length; i++) {
+    dotProduct += a[i] * b[i];
+    normA += a[i] * a[i];
+    normB += b[i] * b[i];
+  }
+  
+  if (normA === 0 || normB === 0) return 0;
+  return dotProduct / (Math.sqrt(normA) * Math.sqrt(normB));
+}
+
+function detectLanguage(filePath: string): string {
+  const ext = path.extname(filePath);
+  const langMap: Record<string, string> = {
+    '.ts': 'typescript',
+    '.tsx': 'typescript',
+    '.js': 'javascript',
+    '.jsx': 'javascript',
+    '.mjs': 'javascript',
+    '.py': 'python',
+    '.java': 'java',
+    '.cs': 'csharp',
+    '.go': 'go',
+    '.rs': 'rust',
+    '.rb': 'ruby',
+    '.php': 'php',
+  };
+  return langMap[ext] || 'unknown';
+}
+
+async function getFilesInPath(rootPath: string): Promise<string[]> {
+  const patterns = [
+    '**/*.ts',
+    '**/*.tsx',
+    '**/*.js',
+    '**/*.jsx',
+    '**/*.mjs',
+    '**/*.py',
+    '**/*.java',
+    '**/*.cs',
+    '**/*.go',
+    '**/*.rs',
+    '**/*.rb',
+    '**/*.php',
+  ];
+
+  const ignorePatterns = [
+    '**/node_modules/**',
+    '**/dist/**',
+    '**/build/**',
+    '**/.git/**',
+    '**/coverage/**',
+    '**/*.min.js',
+    '**/*.bundle.js',
+  ];
+
+  const files = await fg(patterns, {
+    cwd: rootPath,
+    absolute: true,
+    ignore: ignorePatterns,
+    onlyFiles: true,
+  });
+
+  // Filter out files larger than 100KB to avoid memory issues
+  const MAX_FILE_SIZE = 100 * 1024;
+  const filteredFiles: string[] = [];
+  
+  for (const file of files) {
+    try {
+      const stats = await fs.stat(file);
+      if (stats.size <= MAX_FILE_SIZE) {
+        filteredFiles.push(file);
+      }
+    } catch {
+      // Skip files that can't be accessed
+    }
+  }
+
+  return filteredFiles;
 }
 
 async function getAllRelatedFiles(changedFiles: string[]): Promise<string[]> {
-  // Simplified - would traverse dependencies
-  return changedFiles;
+  const relatedFiles = new Set<string>(changedFiles);
+  const visited = new Set<string>();
+  const maxDepth = 3;
+
+  // Forward dependency traversal (imports)
+  const queue: Array<{ file: string; depth: number }> = changedFiles.map(f => ({ file: f, depth: 0 }));
+  
+  while (queue.length > 0) {
+    const { file, depth } = queue.shift()!;
+    
+    if (visited.has(file) || depth >= maxDepth) continue;
+    visited.add(file);
+    
+    try {
+      const content = await fs.readFile(file, 'utf-8');
+      const imports = extractImportsFromContent(content, file);
+      
+      for (const imp of imports) {
+        if (!relatedFiles.has(imp)) {
+          relatedFiles.add(imp);
+          queue.push({ file: imp, depth: depth + 1 });
+        }
+      }
+    } catch {
+      // Skip files that can't be read
+    }
+  }
+
+  // Reverse dependency scan (who imports these files)
+  try {
+    const rootDir = path.dirname(changedFiles[0]);
+    const allFiles = await getFilesInPath(rootDir);
+    
+    for (const file of allFiles) {
+      if (visited.has(file)) continue;
+      
+      try {
+        const content = await fs.readFile(file, 'utf-8');
+        const imports = extractImportsFromContent(content, file);
+        
+        // Check if this file imports any of our changed files
+        for (const changedFile of changedFiles) {
+          if (imports.includes(changedFile)) {
+            relatedFiles.add(file);
+            break;
+          }
+        }
+      } catch {
+        // Skip files that can't be read
+      }
+    }
+  } catch {
+    // If reverse scan fails, just return forward dependencies
+  }
+
+  return Array.from(relatedFiles);
+}
+
+function extractImportsFromContent(content: string, filePath: string): string[] {
+  const imports: string[] = [];
+  const ext = path.extname(filePath);
+  const dir = path.dirname(filePath);
+  
+  // TypeScript/JavaScript import patterns
+  if (['.ts', '.tsx', '.js', '.jsx', '.mjs'].includes(ext)) {
+    // ES6 imports: import ... from '...'
+    const es6ImportRegex = /import\s+(?:[\w\s{},*]*\s+from\s+)?['"]([^'"]+)['"]/g;
+    let match;
+    while ((match = es6ImportRegex.exec(content)) !== null) {
+      const importPath = match[1];
+      const resolvedPath = resolveImportPath(importPath, dir);
+      if (resolvedPath) imports.push(resolvedPath);
+    }
+    
+    // CommonJS requires: require('...')
+    const cjsRequireRegex = /require\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    while ((match = cjsRequireRegex.exec(content)) !== null) {
+      const importPath = match[1];
+      const resolvedPath = resolveImportPath(importPath, dir);
+      if (resolvedPath) imports.push(resolvedPath);
+    }
+    
+    // Dynamic imports: import('...')
+    const dynamicImportRegex = /import\s*\(\s*['"]([^'"]+)['"]\s*\)/g;
+    while ((match = dynamicImportRegex.exec(content)) !== null) {
+      const importPath = match[1];
+      const resolvedPath = resolveImportPath(importPath, dir);
+      if (resolvedPath) imports.push(resolvedPath);
+    }
+  }
+  
+  // Python imports
+  if (ext === '.py') {
+    // from ... import ...
+    const fromImportRegex = /from\s+([.\w]+)\s+import/g;
+    let match;
+    while ((match = fromImportRegex.exec(content)) !== null) {
+      const modulePath = match[1].replace(/\./g, '/') + '.py';
+      const resolvedPath = path.resolve(dir, modulePath);
+      imports.push(resolvedPath);
+    }
+    
+    // import ...
+    const importRegex = /^import\s+([.\w]+)/gm;
+    while ((match = importRegex.exec(content)) !== null) {
+      const modulePath = match[1].replace(/\./g, '/') + '.py';
+      const resolvedPath = path.resolve(dir, modulePath);
+      imports.push(resolvedPath);
+    }
+  }
+  
+  return imports;
+}
+
+function resolveImportPath(importPath: string, fromDir: string): string | null {
+  // Skip node_modules and external packages
+  if (!importPath.startsWith('.') && !importPath.startsWith('/')) {
+    return null;
+  }
+  
+  let resolved = path.resolve(fromDir, importPath);
+  
+  // Try common extensions if no extension provided
+  if (!path.extname(resolved)) {
+    const extensions = ['.ts', '.tsx', '.js', '.jsx', '.mjs'];
+    for (const ext of extensions) {
+      const withExt = resolved + ext;
+      try {
+        // We can't use fs.existsSync in async context, so we'll just return the path
+        // The actual file existence check will happen when trying to read it
+        return withExt;
+      } catch {
+        continue;
+      }
+    }
+    // Try index files
+    for (const ext of extensions) {
+      const indexPath = path.join(resolved, `index${ext}`);
+      return indexPath;
+    }
+  }
+  
+  return resolved;
 }
 
 function detectLayerViolations(

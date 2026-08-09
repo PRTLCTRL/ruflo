@@ -61,7 +61,9 @@
     "directory": "v3/plugins/code-intelligence"
   },
   "dependencies": {
-    "zod": "^3.23.0"
+    "zod": "^3.23.0",
+    "fast-glob": "^3.3.3",
+    "@claude-flow/embeddings": "^3.0.0-alpha.1"
   },
   "devDependencies": {
     "@types/node": "^20.0.0",
